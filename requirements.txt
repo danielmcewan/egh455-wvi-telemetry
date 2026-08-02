@@ -1,0 +1,6 @@
+# Minimum versions, not exact pins - exact pins fight whatever else is on the
+# machine. Install into the project's own virtual environment (see README).
+fastapi>=0.115
+uvicorn[standard]>=0.34
+pillow>=11
+requests>=2.32

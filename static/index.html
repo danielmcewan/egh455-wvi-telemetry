@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UAVPayloadTAQ-26 Group One — Web Visualisation (WVI)</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-id">
+    <div class="system">UAVPayload<sup>TAQ</sup>-26 &nbsp;&middot;&nbsp; Group One</div>
+    <div class="subsystem">Web Visualisation Subsystem (WVI)</div>
+  </div>
+  <dl class="statusbar">
+    <div class="stat" id="conn" data-state="init">
+      <dt>Link</dt><dd id="conn-text">connecting</dd>
+    </div>
+    <div class="stat" id="latency"
+         title="Sensor capture to server, and capture to screen. REQ-M-19 budget: 4000 ms.">
+      <dt>Latency</dt><dd id="latency-val">&mdash;</dd>
+    </div>
+    <div class="stat" id="sources">
+      <dt>Sources</dt><dd id="sources-val">&mdash;</dd>
+    </div>
+  </dl>
+</header>
+
+<main>
+
+  <section class="block">
+    <div class="block-head">
+      <h2>Air Sampling</h2>
+      <span class="tag">REQ-F-06</span>
+      <span class="rule"></span>
+      <span class="note">Live, updating for the duration of the flight</span>
+    </div>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <div class="columns">
+    <section class="block">
+      <div class="block-head">
+        <h2>Object Detector Feed</h2>
+        <span class="tag">REQ-F-07</span>
+        <span class="rule"></span>
+      </div>
+      <figure class="feed">
+        <img id="feed" src="/video/stream.mjpg" alt="Live object detector feed">
+        <figcaption>MJPEG stream from the onboard camera</figcaption>
+      </figure>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>Target Detections</h2>
+        <span class="tag">REQ-F-07</span>
+        <span class="rule"></span>
+      </div>
+      <div class="targets" id="targets">
+        <p class="empty">No targets detected.</p>
+      </div>
+    </section>
+  </div>
+
+  <section class="block">
+    <div class="block-head">
+      <h2>Logged Data</h2>
+      <span class="tag">REQ-F-08</span>
+      <span class="rule"></span>
+      <span class="controls">
+        <label for="hist-kind">Record type</label>
+        <select id="hist-kind">
+          <option value="readings">Air readings</option>
+          <option value="detections">Target detections</option>
+        </select>
+        <button id="hist-refresh" type="button">Refresh</button>
+      </span>
+    </div>
+    <div class="table-wrap">
+      <table id="hist"><thead></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <span>Transport: Server-Sent Events &middot; Video: MJPEG &middot; Store: SQLite</span>
+  <nav><a href="/docs">Interface documentation</a><a href="/healthz">Health</a><a href="/api/latency">Latency record</a></nav>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

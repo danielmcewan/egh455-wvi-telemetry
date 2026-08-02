@@ -1,0 +1,14 @@
+# Virtual environment
+.venv/
+__pycache__/
+*.py[cod]
+
+# Runtime telemetry log - regenerated on every run, not source
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Captured target snapshots
+targets/
+
+.env
