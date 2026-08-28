@@ -1,0 +1,34 @@
+name: ci
+
+# Gate: the FastAPI app imports cleanly and the declared requirements install.
+# This catches the common failure on this project - a route added without its
+# supporting dependency (python-multipart), which only explodes at import time.
+
+on:
+  push:
+    branches: [main, mobile-layout]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: install dependencies
+        run: pip install -r requirements.txt
+
+      - name: import the app
+        run: python -c "from app.main import app; print('app imported OK:', app.title)"
+
+      - name: syntax check
+        run: python -m compileall -q app tools run.py
