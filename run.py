@@ -9,8 +9,17 @@ reach it.
 """
 import os
 import socket
+import sys
 
 import uvicorn
+
+# Make `python /some/path/to/run.py` work from any working directory. Uvicorn
+# imports the app by the string "app.main:app", which needs this file's folder
+# on the import path - and on a Pi you will absolutely start this from a
+# systemd unit or an ssh session that is not sitting in the project folder.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
 
 HOST = os.getenv("WVI_HOST", "0.0.0.0")
 PORT = int(os.getenv("WVI_PORT", "8000"))

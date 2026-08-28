@@ -221,3 +221,263 @@ footer a:hover{color:var(--accent); border-bottom-color:var(--accent)}
   .statusbar,footer nav{display:none}
   body{font-size:11px}
 }
+
+/* ==========================================================================
+   Additions for the search, imagery, filtering and verification work.
+   Same restraint as above: no gradients, no decorative motion, one accent.
+   ========================================================================== */
+
+/* ------------------------------------------------- accessibility helpers */
+.sr-only{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+}
+.skip{
+  position:absolute; left:-9999px; top:0; z-index:60;
+  background:var(--accent); color:#fff; padding:8px 14px; font-size:13px;
+}
+.skip:focus{left:0}
+
+/* ------------------------------------------------------------- alert bar */
+/* REQ-F-05. Sits directly under the masthead so it lands in the same glance
+   as the video feed, which is where the operator is already looking. */
+.alert{
+  display:flex; align-items:center; gap:12px;
+  padding:7px 28px; border-bottom:1px solid var(--line);
+  background:var(--surface-alt); font-size:12.5px; color:var(--ink-2);
+}
+.alert-label{
+  font-size:9.5px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink-3); white-space:nowrap;
+}
+.alert-body{font-family:var(--mono); font-size:12px; flex:1; min-width:0}
+.alert-x{
+  border:0; background:none; font-size:17px; line-height:1; color:var(--ink-3);
+  padding:2px 6px; cursor:pointer;
+}
+.alert-x:hover{color:var(--ink)}
+.alert[data-state="new"]{background:#eef3fb; border-bottom-color:var(--accent); color:var(--accent)}
+.alert[data-state="new"] .alert-body{font-weight:600}
+.alert[data-state="drill"]{background:#fdf4e3; border-bottom-color:var(--warn); color:var(--warn)}
+.alert[data-state="drill"] .alert-body{font-weight:600}
+.alert[data-state="seen"]{color:var(--ink-3)}
+.alert.pulse{animation:alertflash .9s ease-out 1}
+@keyframes alertflash{from{background:#dfe8f6}to{}}
+@media(prefers-reduced-motion:reduce){.alert.pulse{animation:none}}
+
+/* --------------------------------------------------------------- toolbar */
+.toolbar{
+  display:flex; align-items:center; gap:14px;
+  padding:11px 28px; border-bottom:1px solid var(--line); background:var(--surface);
+}
+.search{position:relative; display:flex; align-items:center; flex:1; max-width:640px}
+.search-icon{
+  position:absolute; left:9px; width:14px; height:14px; color:var(--ink-3);
+  pointer-events:none;
+}
+#q{
+  width:100%; font:13px var(--sans); color:var(--ink);
+  background:var(--surface); border:1px solid var(--line-strong); border-radius:2px;
+  padding:7px 30px 7px 29px;
+}
+#q::-webkit-search-cancel-button{display:none}
+#q:focus{outline:2px solid var(--accent); outline-offset:-1px; border-color:var(--accent)}
+#q::placeholder{color:var(--ink-3)}
+.q-clear{
+  position:absolute; right:4px; border:0; background:none; cursor:pointer;
+  font-size:17px; line-height:1; color:var(--ink-3); padding:3px 7px;
+}
+.q-clear:hover{color:var(--ink)}
+.toolbar-hint{font-size:11px; color:var(--ink-3); white-space:nowrap}
+kbd{
+  font-family:var(--mono); font-size:10.5px; border:1px solid var(--line-strong);
+  border-bottom-width:2px; border-radius:3px; padding:0 4px; background:var(--surface-alt);
+}
+
+/* ----------------------------------------------------------- type tally */
+.tally{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px}
+.chip{
+  font:11px var(--sans); color:var(--ink-2); background:var(--surface-alt);
+  border:1px solid var(--line); border-radius:2px; padding:3px 8px; cursor:pointer;
+}
+.chip:hover{border-color:var(--accent); color:var(--accent)}
+.chip-n{font-family:var(--mono); font-weight:600; color:var(--accent); margin-right:3px}
+.chip-empty{color:var(--ink-3); cursor:default}
+.chip-empty:hover{border-color:var(--line); color:var(--ink-3)}
+
+/* -------------------------------------------------- target cards + thumbs */
+/* Overrides the text-only card above: REQ-F-07 asks for the target images, so
+   the picture becomes the primary element and the metadata sits beside it. */
+.target{
+  display:grid; grid-template-columns:64px 1fr; gap:0 11px; align-items:start;
+  padding:9px 12px;
+}
+.target-body{display:grid; grid-template-columns:1fr auto; gap:2px 10px; min-width:0}
+.target-body .cls{font-family:var(--mono); font-weight:600; color:var(--accent)}
+.target-body .time{font-family:var(--mono); font-size:11px; color:var(--ink-3); text-align:right}
+.target-body .meta{
+  font-family:var(--mono); font-size:11px; color:var(--ink-2);
+  grid-column:1/-1; overflow-wrap:anywhere;
+}
+.target-body .flag{
+  grid-column:1/-1; font-size:10.5px; color:var(--warn);
+  text-transform:uppercase; letter-spacing:.05em; margin-top:2px;
+}
+.thumb{
+  width:64px; height:64px; padding:0; border:1px solid var(--line-strong);
+  background:var(--surface-alt); cursor:zoom-in; overflow:hidden; display:block;
+}
+.thumb:hover{border-color:var(--accent)}
+.thumb:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.thumb img{width:100%; height:100%; object-fit:cover; display:block}
+.thumb-none{
+  cursor:default; display:flex; align-items:center; justify-content:center;
+  font-size:9.5px; line-height:1.2; text-align:center; color:var(--ink-3);
+  text-transform:uppercase; letter-spacing:.05em;
+}
+.thumb-none:hover{border-color:var(--line-strong)}
+.panel-foot{
+  margin:0; padding:6px 12px; font-size:11px; color:var(--ink-3);
+  border:1px solid var(--line); border-top:0; background:var(--surface-alt);
+}
+
+/* --------------------------------------------------------------- filters */
+.filters{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:10px 14px; padding:11px 13px; margin-bottom:10px;
+  border:1px solid var(--line); background:var(--surface-alt);
+}
+.field{display:flex; flex-direction:column; gap:3px; min-width:0}
+.field label{font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3)}
+.field select,.field input{
+  font:12px var(--sans); color:var(--ink); background:var(--surface);
+  border:1px solid var(--line-strong); border-radius:2px; padding:4px 7px;
+  min-width:0; width:100%;
+}
+.field input:focus-visible,.field select:focus-visible{
+  outline:2px solid var(--accent); outline-offset:1px;
+}
+.field.actions{flex-direction:row; align-items:flex-end; gap:7px; flex-wrap:wrap}
+.field.actions button,.btn{white-space:nowrap}
+.btn{
+  font:12px var(--sans); color:var(--ink); background:var(--surface);
+  border:1px solid var(--line-strong); border-radius:2px; padding:4px 8px;
+  text-decoration:none; display:inline-block;
+}
+.btn:hover{background:#fff; border-color:var(--accent); color:var(--accent)}
+
+/* ----------------------------------------------------------------- pager */
+.pager{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:8px 0 0; font-size:11.5px; color:var(--ink-3);
+}
+.pager .rule{flex:1; height:1px; background:var(--line)}
+.pager .auto{display:flex; align-items:center; gap:5px; color:var(--ink-3)}
+#hist-count{font-family:var(--mono); color:var(--ink-2)}
+
+/* ---------------------------------------------------------- verification */
+.verify{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  border-top:1px solid var(--line); border-left:1px solid var(--line);
+}
+.vcard{
+  border-right:1px solid var(--line); border-bottom:1px solid var(--line);
+  padding:12px 14px 13px; background:var(--surface);
+}
+.vhead{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:9px}
+.vhead h3{
+  margin:0; font-size:11.5px; font-weight:600; letter-spacing:.04em;
+  text-transform:uppercase; color:var(--ink-2);
+}
+.verdict{
+  margin-left:auto; font-family:var(--mono); font-size:10px; font-weight:600;
+  letter-spacing:.08em; padding:2px 6px; border:1px solid currentColor;
+}
+.vcard[data-verdict="PASS"] .verdict{color:var(--ok)}
+.vcard[data-verdict="FAIL"] .verdict{color:var(--bad)}
+.vcard[data-verdict="PENDING"] .verdict,
+.vcard[data-verdict="NOT MET"] .verdict{color:var(--ink-3)}
+.vcard[data-verdict="TRIPPED"] .verdict{color:var(--warn)}
+.vcard dl{
+  margin:0; display:grid; grid-template-columns:1fr auto; gap:3px 12px;
+  font-size:11.5px;
+}
+.vcard dt{color:var(--ink-3)}
+.vcard dd{margin:0; font-family:var(--mono); color:var(--ink); text-align:right}
+.vnote{
+  margin:9px 0 0; padding-top:8px; border-top:1px solid var(--line);
+  font-size:10.5px; line-height:1.4; color:var(--ink-3);
+}
+
+#logged[data-state="good"] dd{color:var(--ok)}
+#logged[data-state="wait"] dd{color:var(--warn)}
+
+/* -------------------------------------------------------------- lightbox */
+.lightbox{
+  position:fixed; inset:0; z-index:50; display:flex; align-items:center;
+  justify-content:center; padding:24px; background:rgba(16,20,24,.82);
+}
+.lightbox[hidden]{display:none}
+.lightbox figure{margin:0; max-width:min(92vw,720px); background:var(--surface)}
+.lightbox img{
+  display:block; width:100%; height:auto; max-height:78vh; object-fit:contain;
+  background:#101418;
+}
+.lightbox figcaption{
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-2);
+  padding:8px 12px; border-top:1px solid var(--line);
+}
+.lightbox-x{
+  position:absolute; top:14px; right:18px; border:0; background:none;
+  color:#fff; font-size:30px; line-height:1; cursor:pointer; padding:4px 10px;
+}
+
+/* -------------------------------------------------------------- handheld */
+@media(max-width:640px){
+  /* Four status cells no longer fit across a 375px screen in one row. */
+  .statusbar{grid-template-columns:repeat(2,1fr)}
+  .stat{border-bottom:1px solid var(--line)}
+  .stat:nth-child(n+3){border-bottom:0}
+  .stat:nth-child(even){border-right:0}
+
+  .alert{padding:8px 14px; gap:8px; flex-wrap:wrap}
+  .alert-label{flex-basis:100%}
+  .alert-x{margin-left:auto; min-width:44px; min-height:32px}
+
+  .toolbar{padding:10px 14px; flex-wrap:wrap; gap:8px}
+  .search{max-width:none}
+  /* 16px is the threshold below which iOS Safari zooms the page on focus. */
+  #q{font-size:16px; padding:11px 34px 11px 30px}
+  .toolbar-hint{display:none}
+
+  /* One filter per row reads better than two half-width ones on a phone. */
+  .filters{grid-template-columns:1fr; padding:12px}
+  .field select,.field input{font-size:16px; padding:10px; min-height:44px}
+  .field.actions{flex-direction:column; align-items:stretch}
+  .field.actions button,.btn{min-height:44px; padding:11px 12px; text-align:center}
+
+  .target{grid-template-columns:76px 1fr; gap:0 12px}
+  .thumb{width:76px; height:76px}
+
+  .pager{gap:10px}
+  .pager button{flex:1; min-height:44px}
+  .pager .rule{display:none}
+  #hist-count{flex-basis:100%}
+
+  .verify{grid-template-columns:1fr}
+  .lightbox{padding:12px}
+}
+
+/* Inline "did you mean the other table" action in the row counter. Styled as
+   text because it is a suggestion, not a primary control. */
+.linkish{
+  border:0; background:none; padding:0; cursor:pointer; font:inherit;
+  color:var(--accent); text-decoration:underline;
+}
+.linkish:hover{color:var(--ink)}
+
+/* The hidden attribute is applied by the UA stylesheet as display:none, which
+   any author display rule silently beats - .field{display:flex} was winning,
+   so the detection-only filters stayed on screen while showing air readings.
+   This is the standard fix and it has to carry !important to do its job. */
+[hidden]{display:none !important}

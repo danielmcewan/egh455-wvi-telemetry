@@ -4,3 +4,7 @@ fastapi>=0.115
 uvicorn[standard]>=0.34
 pillow>=11
 requests>=2.32
+# Needed for the multipart upload route the image processing subsystem uses to
+# POST target snapshots (/api/targets/image). FastAPI raises at import time if
+# a multipart route is declared without it, so this is not optional.
+python-multipart>=0.0.9

@@ -52,7 +52,21 @@ class DetectionData(BaseModel):
     aruco_id: Optional[int] = None
     # Feeds REQ-F-09's 2 bar drill threshold. Null unless cls == "gauge".
     gauge_value_bar: Optional[float] = None
+
+    # REQ-F-07 demands the *images of the targets* be displayed, not just a
+    # list of what was found. There are three legitimate ways for IP to get a
+    # snapshot to us and all three end up populating `image_ref`:
+    #   1. IP writes the file into data/targets/ itself (same Pi) and sends
+    #      just the file name here;
+    #   2. IP sends the bytes inline as base64 in `image_b64` below - the
+    #      server writes the file and fills `image_ref` in on their behalf;
+    #   3. IP POSTs the file to /api/targets/image first and puts the returned
+    #      name here.
+    # Whichever they pick, the browser only ever sees `image_ref`.
     image_ref: Optional[str] = None
+    # Base64 of the JPEG/PNG bytes. Optional, and stripped before storage -
+    # we keep the file, not a giant string in the database or on the wire.
+    image_b64: Optional[str] = Field(default=None, exclude=True)
 
     model_config = {"populate_by_name": True}
 

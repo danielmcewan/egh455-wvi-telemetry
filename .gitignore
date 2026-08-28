@@ -12,3 +12,5 @@ data/*.db-wal
 targets/
 
 .env
+
+.vercel
