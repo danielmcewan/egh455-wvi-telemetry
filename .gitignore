@@ -14,3 +14,6 @@ targets/
 .env
 
 .vercel
+
+# Scratch image the publisher stub demo regenerates
+_demo_target_crop.jpg

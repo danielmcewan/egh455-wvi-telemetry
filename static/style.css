@@ -27,6 +27,67 @@ body{
   font-variant-numeric:tabular-nums;
 }
 
+
+/* ---------------------------------------------------- navigation menu */
+/* HLO-M-3: "Navigation Menu: A menu at the top of the interface provides
+   navigation options to different sections". Sticky so it stays at the top
+   once the page scrolls - a menu that scrolls away stops being a menu. */
+.mainnav{
+  position:sticky; top:0; z-index:30;
+  display:flex; align-items:center; justify-content:space-between;
+  gap:16px; padding:0 28px;
+  background:var(--accent); border-bottom:1px solid #16294a;
+}
+.mainnav ul{display:flex; gap:2px; margin:0; padding:0; list-style:none; flex-wrap:wrap}
+.mainnav a{
+  display:block; padding:10px 14px;
+  font-size:12px; font-weight:600; letter-spacing:.02em;
+  color:#c9d8ee; text-decoration:none;
+  border-bottom:2px solid transparent;
+}
+.mainnav a:hover{color:#fff; background:#2a4675}
+.mainnav a[aria-current]{color:#fff; border-bottom-color:#fff; background:#2a4675}
+.mainnav a:focus-visible{outline:2px solid #fff; outline-offset:-2px}
+.mainnav .speak{
+  display:flex; align-items:center; gap:6px;
+  font-size:11px; color:#c9d8ee; white-space:nowrap; cursor:pointer;
+}
+.mainnav .speak input{accent-color:#fff; margin:0}
+.mainnav .speak input:disabled + span{opacity:.5}
+
+/* Sections are focus targets for the menu, but should not draw a focus ring
+   when reached by mouse. */
+.block[tabindex="-1"]:focus{outline:none}
+.block[tabindex="-1"]:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+/* Anchor scrolling has to clear the sticky bar. */
+html{scroll-behavior:smooth}
+.block[id]{scroll-margin-top:56px}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+/* ------------------------------------------------- localisation + LCD */
+/* HLO-M-3 asks for the UAV's x/y/z position relative to the marker to be shown
+   with the detection. Only ArUco detections carry one, so the line is absent
+   rather than showing three dashes on the other three target types. */
+.target .pose{
+  grid-column:1/-1; font-family:var(--mono); font-size:11px;
+  color:var(--accent); background:var(--surface-alt);
+  border:1px solid var(--line); border-radius:2px;
+  padding:2px 6px; margin-top:3px;
+}
+
+/* HLO-M-5: the operator selects the LCD display from the web interface. */
+.lcd{
+  display:flex; align-items:center; flex-wrap:wrap; gap:10px;
+  margin-top:14px; padding:10px 14px;
+  border:1px solid var(--line); background:var(--surface-alt);
+}
+.lcd-label{
+  font-size:10px; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--ink-2); font-weight:600;
+}
+.lcd-state{font-family:var(--mono); font-size:11px; color:var(--ink-3)}
+
 /* ---------------------------------------------------------- masthead */
 .masthead{
   display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;
@@ -170,6 +231,21 @@ footer a:hover{color:var(--accent); border-bottom-color:var(--accent)}
     flex-direction:column; align-items:stretch; gap:12px;
     padding:13px 14px 12px;
   }
+
+  /* The menu scrolls sideways inside its own bar so five entries never push
+     the page wider than the screen. */
+  .mainnav{padding:0; flex-wrap:nowrap}
+  .mainnav ul{
+    flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .mainnav ul::-webkit-scrollbar{display:none}
+  .mainnav a{padding:12px 13px; font-size:12.5px; white-space:nowrap}
+  .mainnav .speak{padding-right:12px; font-size:11px}
+  .block[id]{scroll-margin-top:52px}
+
+  .lcd{gap:8px}
+  .lcd select,.lcd button{flex:1; min-width:0}
   .masthead-id .system{font-size:15px}
   .masthead-id .subsystem{font-size:11px}
 
@@ -218,7 +294,7 @@ footer a:hover{color:var(--accent); border-bottom-color:var(--accent)}
 }
 
 @media print{
-  .statusbar,footer nav{display:none}
+  .statusbar,footer nav,.mainnav{display:none}
   body{font-size:11px}
 }
 

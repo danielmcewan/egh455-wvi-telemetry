@@ -35,6 +35,23 @@
   </dl>
 </header>
 
+<!-- HLO-M-3, first bullet: "Navigation Menu: A menu at the top of the interface
+     provides navigation options to different sections, e.g. Air quality charts,
+     identified targets, live video feed, and logs." The customer names the
+     sections, so the menu uses the customer's names for them. -->
+<nav class="mainnav" id="mainnav" aria-label="Dashboard sections">
+  <ul>
+    <li><a href="#sec-air"     data-sec="sec-air">Air Quality</a></li>
+    <li><a href="#sec-targets" data-sec="sec-targets">Identified Targets</a></li>
+    <li><a href="#sec-feed"    data-sec="sec-feed">Live Video Feed</a></li>
+    <li><a href="#sec-logs"    data-sec="sec-logs">Logs</a></li>
+    <li><a href="#sec-mission" data-sec="sec-mission">Mission Record</a></li>
+  </ul>
+  <label class="speak" title="HLO-M-2: the GCS notifies the operator by vocalising the detected target.">
+    <input type="checkbox" id="speak-toggle"> <span>Speak alerts</span>
+  </label>
+</nav>
+
 <!-- REQ-F-05: the operator must be alerted to a target's TYPE. A list that
      scrolls is not an alert, so the newest detection also gets announced here
      and is read out by screen readers. -->
@@ -52,7 +69,7 @@
       <path d="M10.4 10.4 L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
     </svg>
     <input type="search" id="q" autocomplete="off" spellcheck="false"
-           placeholder="Search targets and logged data — class, ArUco id, source, timestamp…">
+           placeholder="Search targets and logged data — class, ArUco id, coordinates, source, timestamp…">
     <button type="button" id="q-clear" class="q-clear" hidden aria-label="Clear search">&times;</button>
   </div>
   <span class="toolbar-hint" id="q-hint">Press <kbd>/</kbd> to search</span>
@@ -60,7 +77,7 @@
 
 <main id="main">
 
-  <section class="block">
+  <section class="block" id="sec-air" tabindex="-1">
     <div class="block-head">
       <h2>Air Sampling</h2>
       <span class="tag">REQ-F-06</span>
@@ -71,7 +88,7 @@
   </section>
 
   <div class="columns">
-    <section class="block">
+    <section class="block" id="sec-feed" tabindex="-1">
       <div class="block-head">
         <h2>Object Detector Feed</h2>
         <span class="tag">REQ-F-07</span>
@@ -83,7 +100,7 @@
       </figure>
     </section>
 
-    <section class="block">
+    <section class="block" id="sec-targets" tabindex="-1">
       <div class="block-head">
         <h2>Target Detections</h2>
         <span class="tag">REQ-F-05</span>
@@ -108,7 +125,7 @@
     </section>
   </div>
 
-  <section class="block">
+  <section class="block" id="sec-logs" tabindex="-1">
     <div class="block-head">
       <h2>Logged Data</h2>
       <span class="tag">REQ-F-08</span>
@@ -179,7 +196,7 @@
     </div>
   </section>
 
-  <section class="block">
+  <section class="block" id="sec-mission" tabindex="-1">
     <div class="block-head">
       <h2>Mission Record &amp; Verification</h2>
       <span class="tag">REQ-M-15</span>
@@ -189,6 +206,23 @@
       <span class="note">Evidence taken from the stored log, not from a counter in memory</span>
     </div>
     <div class="verify" id="verify"></div>
+
+    <!-- HLO-M-5: "The operator must be able to select the desired display ...
+         and remotely from the GCS Web interface." WVI holds the operator's
+         choice and exposes it at GET /api/lcd; the enclosure subsystem polls
+         that and drives the panel. -->
+    <div class="lcd" id="lcd">
+      <span class="lcd-label">Payload LCD display</span>
+      <label class="sr-only" for="lcd-mode">LCD display mode</label>
+      <select id="lcd-mode">
+        <option value="ip">IP address</option>
+        <option value="detection">Live target detection</option>
+        <option value="temperature">Temperature</option>
+      </select>
+      <button type="button" id="lcd-set">Set display</button>
+      <span class="lcd-state" id="lcd-state">&mdash;</span>
+      <span class="tag">HLO-M-5</span>
+    </div>
   </section>
 
 </main>

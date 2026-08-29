@@ -116,6 +116,16 @@ class Simulator:
         # the drill-trigger condition flip during testing.
         bar = round(random.uniform(0.8, 3.4), 2) if cls == "gauge" else None
 
+        # HLO-M-2: ArUco pose gives the UAV's local position in the camera's
+        # frame. Ranges are chosen to look like the real enclosure - a marker
+        # 1.5 to 4 m ahead, roughly level, at the 1-3 m flight altitude.
+        if cls == "aruco":
+            pose = (round(random.uniform(-1.8, 1.8), 2),
+                    round(random.uniform(-0.6, 0.6), 2),
+                    round(random.uniform(1.5, 4.0), 2))
+        else:
+            pose = (None, None, None)
+
         label = cls
         if aruco_id is not None:
             label = f"{cls} #{aruco_id}"
@@ -133,6 +143,7 @@ class Simulator:
                 "bbox": [random.randint(20, 400), random.randint(20, 300), 96, 96],
                 "aruco_id": aruco_id,
                 "gauge_value_bar": bar,
+                "pose_x_m": pose[0], "pose_y_m": pose[1], "pose_z_m": pose[2],
                 "image_ref": _snapshot(cls, self._det_seq, label),
             },
         )

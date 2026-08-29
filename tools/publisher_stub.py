@@ -47,7 +47,7 @@ def send_air_reading(url: str, seq: int, readings: dict) -> None:
 
 def send_detection(url: str, seq: int, cls: str, confidence: float, bbox: list,
                    aruco_id=None, gauge_value_bar=None, image_ref=None,
-                   image_path=None) -> dict:
+                   image_path=None, pose=None) -> dict:
     """Send one detection event - one per DETECTION, not one per frame.
 
     Two ways to attach the target snapshot, pick either:
@@ -61,6 +61,10 @@ def send_detection(url: str, seq: int, cls: str, confidence: float, bbox: list,
                                writes straight into the payload's data/targets/
                                folder because you share the Pi.
 
+    `pose=(x, y, z)` carries the localisation coordinates HLO-M-3 asks for -
+    metres, in the camera's frame, relative to the ArUco marker. Send all three
+    or none. Only meaningful for class "aruco".
+
     Returns the server's reply, which includes the stored `image_ref` so you
     can log your end of the handshake.
     """
@@ -72,6 +76,10 @@ def send_detection(url: str, seq: int, cls: str, confidence: float, bbox: list,
         "gauge_value_bar": gauge_value_bar,   # only for class "gauge"
         "image_ref": image_ref,
     }
+
+    if pose is not None:
+        x, y, z = pose                   # metres, camera frame - HLO-M-3
+        data.update(pose_x_m=x, pose_y_m=y, pose_z_m=z)
 
     if image_path:
         raw = Path(image_path).read_bytes()
@@ -153,3 +161,8 @@ if __name__ == "__main__":
     print("sent detection seq=1 (gauge, 1.7 bar - below the 2 bar drill threshold)")
     print("  server stored the snapshot as:", reply.get("image_ref"))
     print("  it is now visible in the Target Detections panel on the dashboard.")
+
+    # An ArUco detection carrying the localisation coordinates HLO-M-3 wants.
+    send_detection(args.url, 2, "aruco", 0.96, [180, 96, 120, 120],
+                   aruco_id=7, pose=(0.42, -0.15, 2.30))
+    print("sent detection seq=2 (aruco id 7, UAV at x 0.42, y -0.15, z 2.30 m)")

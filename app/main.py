@@ -11,6 +11,7 @@ Requirement map:
             GET /api/export.csv      take the log away
   REQ-M-15  GET /api/mission         proof of 10 minutes of logged operation
   REQ-M-19  GET /api/latency         measured end-to-end timing evidence
+  HLO-M-5   GET/POST /api/lcd        operator selects the LCD display remotely
 """
 import asyncio
 import csv
@@ -110,8 +111,10 @@ async def index():
 @app.get("/api/stream")
 async def stream(request: Request):
     """Server-Sent Events: one connection the server pushes down whenever data
-    exists. Chosen over WebSockets because the traffic only ever flows one way,
-    and the browser reconnects on its own if the link drops."""
+    exists. Chosen over WebSockets because telemetry only ever flows one way -
+    payload to operator - and the browser reconnects on its own if the link
+    drops. The one command that travels the other way (the LCD mode, HLO-M-5)
+    is an ordinary POST and does not need a bidirectional socket held open."""
     q = hub.subscribe()
 
     async def gen():
@@ -292,6 +295,33 @@ async def mission():
     stats = db.mission_stats()
     stats["images_stored"] = images.stored_count()
     return stats
+
+
+# ----------------------------------------------------------------- HLO-M-5
+# "The operator must be able to select the desired display, e.g. (IP address,
+# live target detection or temperature) using the proximity sensor on the
+# Pimoroni Env sensor AND REMOTELY FROM THE GCS WEB INTERFACE."
+#
+# The LCD itself belongs to the enclosure subsystem. What WVI owes the system
+# is somewhere for the operator to express the choice and somewhere for the
+# payload to read it back, so this is deliberately a two-line state machine and
+# not an attempt to drive the panel from here.
+LCD_MODES = ("ip", "detection", "temperature")
+_lcd = {"mode": "ip", "set_at": None, "set_by": None}
+
+
+@app.get("/api/lcd")
+async def lcd_state():
+    """Polled by the payload-side LCD driver. Returns the requested mode."""
+    return {**_lcd, "modes": list(LCD_MODES)}
+
+
+@app.post("/api/lcd")
+async def set_lcd(mode: str = Query(..., pattern="^(ip|detection|temperature)$"),
+                  by: str = Query("web")):
+    """Operator selects what the LCD shows, from the web interface."""
+    _lcd.update(mode=mode, set_at=utcnow().isoformat(), set_by=by)
+    return {"accepted": True, **_lcd}
 
 
 @app.get("/healthz")

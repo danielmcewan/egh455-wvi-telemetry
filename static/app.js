@@ -127,6 +127,7 @@ function haystack(ev) {
   return [
     targetClass(ev), ev.source, ev.seq,
     d.aruco_id, d.confidence, d.gauge_value_bar, d.image_ref,
+    d.pose_x_m, d.pose_y_m, d.pose_z_m, poseText(d, { units: false }),
     ev.t_capture, new Date(ev.t_capture).toLocaleTimeString(),
   ].filter(v => v !== null && v !== undefined).join(" ").toLowerCase();
 }
@@ -142,6 +143,17 @@ function visibleTargets() {
     (!cls || targetClass(ev) === cls) && matchesSearch(ev, state.q));
 }
 
+/* HLO-M-3 wants the localisation coordinates shown with the target, not only
+   stored. Formatted as one string because three separate fields on a card that
+   is 150 px wide is unreadable, and because two of the four target classes
+   never carry a pose at all. */
+function poseText(d, { units = true } = {}) {
+  const n = v => typeof v === "number";
+  if (!n(d.pose_x_m) || !n(d.pose_y_m) || !n(d.pose_z_m)) return null;
+  const t = `x ${d.pose_x_m.toFixed(2)}, y ${d.pose_y_m.toFixed(2)}, z ${d.pose_z_m.toFixed(2)}`;
+  return units ? `${t} m` : t;
+}
+
 function targetCard(ev) {
   const d = ev.data || {};
   const cls = targetClass(ev);
@@ -152,6 +164,8 @@ function targetCard(ev) {
   if (d.aruco_id !== null && d.aruco_id !== undefined) bits.push(`id ${d.aruco_id}`);
   if (typeof d.gauge_value_bar === "number") bits.push(`${d.gauge_value_bar.toFixed(2)} bar`);
   bits.push(ev.source);
+
+  const pose = poseText(d);
 
   const url = imageUrl(d.image_ref);
   const when = new Date(ev.t_capture).toLocaleTimeString();
@@ -170,6 +184,7 @@ function targetCard(ev) {
        <div class="cls">${cls}</div>
        <div class="time">${when}</div>
        <div class="meta">${bits.join(" · ")}</div>
+       ${pose ? `<div class="pose" title="UAV position relative to the ArUco marker (HLO-M-3)">${pose}</div>` : ""}
        ${low ? `<div class="flag">below ${GAUGE_DRILL_THRESHOLD_BAR} bar — drill condition met</div>` : ""}
      </div>`;
   return el;
@@ -216,6 +231,8 @@ function raiseAlert(ev) {
   let text = `${cls.replace("_", " ")} detected`;
   if (d.aruco_id !== null && d.aruco_id !== undefined) text += ` — ArUco id ${d.aruco_id}`;
   if (typeof d.gauge_value_bar === "number") text += ` — reading ${d.gauge_value_bar.toFixed(2)} bar`;
+  const pose = poseText(d);
+  if (pose) text += ` — UAV at ${pose}`;
   text += ` · ${(d.confidence * 100).toFixed(0)}% confidence · ${new Date(ev.t_capture).toLocaleTimeString()}`;
   if (low) text += " · DRILL CONDITION MET (REQ-F-09)";
 
@@ -226,9 +243,50 @@ function raiseAlert(ev) {
   void el.offsetWidth;
   el.classList.add("pulse");
 
+  speak(cls, low);
+
   // Settle to a quieter state so a stale alert does not look like a live one.
   clearTimeout(alertTimer);
   alertTimer = setTimeout(() => { el.dataset.state = "seen"; }, 15000);
+}
+
+/* HLO-M-2: "Once a target is autonomously identified, the (GCS) will notify the
+   operator by vocalising the detected target." A live region is read by screen
+   readers only; the customer asked for the target to be spoken aloud, so it is.
+
+   Off by default and remembered per browser: an operator debugging at a desk
+   does not want a voice every six seconds, and browsers block speech until the
+   page has been interacted with anyway. Turn it on before the demo. */
+const SPEAK_KEY = "wvi.speakAlerts";
+let speakOn = false;
+try { speakOn = localStorage.getItem(SPEAK_KEY) === "1"; } catch (_) { /* private mode */ }
+
+const speakToggle = $("speak-toggle");
+if (speakToggle) {
+  speakToggle.checked = speakOn;
+  speakToggle.disabled = !("speechSynthesis" in window);
+  speakToggle.addEventListener("change", () => {
+    speakOn = speakToggle.checked;
+    try { localStorage.setItem(SPEAK_KEY, speakOn ? "1" : "0"); } catch (_) { /* ignore */ }
+    if (speakOn) say("Target announcements enabled");
+  });
+}
+
+function say(text) {
+  if (!("speechSynthesis" in window)) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1.05;
+  // Cancel anything still queued: during a burst of detections the operator
+  // needs the newest target, not a backlog read out in order.
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+}
+
+function speak(cls, drill) {
+  if (!speakOn) return;
+  const spoken = { valve_open: "valve, open", valve_closed: "valve, closed",
+                   gauge: "pressure gauge", aruco: "ArUco marker" }[cls] || cls;
+  say(drill ? `${spoken}. Drill condition met.` : `${spoken} detected`);
 }
 
 $("alert-dismiss").addEventListener("click", () => {
@@ -316,7 +374,8 @@ const HIST_COLS = {
              "light_lux", "gas_oxidising_ohm", "gas_reducing_ohm", "gas_nh3_ohm",
              "ingest_latency_ms"],
   detections: ["t_capture", "source", "seq", "class", "confidence", "gauge_value_bar",
-               "aruco_id", "image_ref", "ingest_latency_ms"],
+               "aruco_id", "pose_x_m", "pose_y_m", "pose_z_m", "image_ref",
+               "ingest_latency_ms"],
 };
 
 /* The date inputs are labelled UTC and the log is stored in UTC, so the value
@@ -611,6 +670,87 @@ function closeLightbox() {
 $("lightbox-close").addEventListener("click", closeLightbox);
 lightbox.addEventListener("click", e => { if (e.target === lightbox) closeLightbox(); });
 
+
+/* ------------------------------------------------------- navigation menu */
+/* HLO-M-3's first bullet. The menu is anchor links, so it works with
+   JavaScript disabled and the browser handles the scrolling; all this adds is
+   which entry is highlighted, which is what makes it read as a menu rather
+   than a row of links. */
+(function nav() {
+  const links = Array.from(document.querySelectorAll(".mainnav a[data-sec]"));
+  if (!links.length) return;
+
+  const byId = new Map(links.map(a => [a.dataset.sec, a]));
+  const visible = new Set();
+
+  function mark(link) {
+    links.forEach(a => a.removeAttribute("aria-current"));
+    if (link) link.setAttribute("aria-current", "true");
+  }
+
+  // Highlight on click regardless of whether the observer below is available,
+  // so the menu still responds if IntersectionObserver is missing or inert.
+  // Move focus as well as the viewport - a menu that only scrolls is not
+  // usable from the keyboard.
+  links.forEach(a => a.addEventListener("click", () => {
+    mark(a);
+    const el = document.getElementById(a.dataset.sec);
+    if (el) setTimeout(() => el.focus({ preventScroll: true }), 300);
+  }));
+
+  if (!("IntersectionObserver" in window)) return;
+
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (e.isIntersecting) visible.add(e.target.id);
+      else visible.delete(e.target.id);
+    }
+    // Highlight the topmost section currently on screen, so scrolling past a
+    // short panel does not leave two entries lit at once.
+    const current = links.map(a => a.dataset.sec).find(id => visible.has(id));
+    if (current) mark(byId.get(current));
+  }, { rootMargin: "-72px 0px -55% 0px", threshold: 0 });
+
+  byId.forEach((_, id) => {
+    const el = document.getElementById(id);
+    if (el) io.observe(el);
+  });
+})();
+
+/* ------------------------------------------------------------- LCD mode */
+/* HLO-M-5 requires the LCD display to be selectable from the web interface.
+   WVI records the operator's choice and publishes it at GET /api/lcd; the
+   enclosure subsystem polls that endpoint and drives the panel. Keeping the
+   panel itself out of this subsystem is deliberate - WVI owns no hardware. */
+const LCD_LABELS = { ip: "IP address", detection: "live target detection",
+                     temperature: "temperature" };
+
+async function loadLcd() {
+  const el = $("lcd-state");
+  if (!el) return;
+  try {
+    const r = await fetch("/api/lcd");
+    const j = await r.json();
+    $("lcd-mode").value = j.mode;
+    el.textContent = j.set_at
+      ? `showing ${LCD_LABELS[j.mode] || j.mode} — set ${new Date(j.set_at).toLocaleTimeString()}`
+      : `showing ${LCD_LABELS[j.mode] || j.mode} (default)`;
+  } catch (_) {
+    el.textContent = "unavailable";
+  }
+}
+
+if ($("lcd-set")) {
+  $("lcd-set").addEventListener("click", async () => {
+    const mode = $("lcd-mode").value;
+    $("lcd-state").textContent = "setting…";
+    try {
+      await fetch(`/api/lcd?mode=${encodeURIComponent(mode)}`, { method: "POST" });
+    } catch (_) { /* loadLcd reports the failure */ }
+    loadLcd();
+  });
+}
+
 /* ---------------------------------------------------------------- boot */
 document.querySelectorAll(".det-only").forEach(el => { el.hidden = true; });
 loadFilterOptions();
@@ -618,3 +758,4 @@ loadHistory();
 loadVerification();
 setInterval(loadFilterOptions, 60000);
 setInterval(loadVerification, 10000);
+loadLcd();

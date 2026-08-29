@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS detections (
     bbox              TEXT    NOT NULL,
     aruco_id          INTEGER,
     gauge_value_bar   REAL,
+    -- HLO-M-3 requires localisation coordinates to be stored with a timestamp,
+    -- not just shown live. Metres, relative to the ArUco marker.
+    pose_x_m          REAL, pose_y_m REAL, pose_z_m REAL,
     image_ref         TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_detections_capture ON detections(t_capture);
@@ -69,7 +72,22 @@ def init() -> None:
     # WAL keeps reads (the history page) from blocking writes (incoming telemetry).
     _conn.execute("PRAGMA journal_mode=WAL")
     _conn.executescript(_SCHEMA)
+    _migrate()
     _conn.commit()
+
+
+def _migrate() -> None:
+    """Add columns that a database created by an earlier version is missing.
+
+    CREATE TABLE IF NOT EXISTS does nothing to a table that already exists, so
+    the localisation columns would never appear on a log that predates them -
+    and the existing log is the evidence for REQ-M-15 and REQ-M-19, so dropping
+    it to pick up a schema change is not an option.
+    """
+    have = {r["name"] for r in _conn.execute("PRAGMA table_info(detections)")}
+    for col in ("pose_x_m", "pose_y_m", "pose_z_m"):
+        if col not in have:
+            _conn.execute(f"ALTER TABLE detections ADD COLUMN {col} REAL")
 
 
 def close() -> None:
@@ -99,12 +117,14 @@ def write_event(event: Dict[str, Any]) -> None:
         else:
             _conn.execute(
                 """INSERT INTO detections (seq, source, t_capture, t_ingest, ingest_latency_ms,
-                       class, confidence, bbox, aruco_id, gauge_value_bar, image_ref)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                       class, confidence, bbox, aruco_id, gauge_value_bar,
+                       pose_x_m, pose_y_m, pose_z_m, image_ref)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (event["seq"], event["source"], event["t_capture"], event["t_ingest"],
                  event["ingest_latency_ms"], d.get("class") or d.get("cls"),
                  d.get("confidence"), json.dumps(d.get("bbox")), d.get("aruco_id"),
-                 d.get("gauge_value_bar"), d.get("image_ref")),
+                 d.get("gauge_value_bar"), d.get("pose_x_m"), d.get("pose_y_m"),
+                 d.get("pose_z_m"), d.get("image_ref")),
             )
         _conn.commit()
 
@@ -123,7 +143,8 @@ _SORTABLE = {
                  "humidity_pct", "pressure_hpa", "light_lux", "gas_oxidising_ohm",
                  "gas_reducing_ohm", "gas_nh3_ohm"},
     "detections": {"t_capture", "seq", "source", "ingest_latency_ms", "class",
-                   "confidence", "gauge_value_bar", "aruco_id"},
+                   "confidence", "gauge_value_bar", "aruco_id",
+                   "pose_x_m", "pose_y_m", "pose_z_m"},
 }
 
 
@@ -239,6 +260,8 @@ def recent_detections(limit: int = 30) -> List[Dict[str, Any]]:
             "data": {"class": r["class"], "confidence": r["confidence"],
                      "bbox": bbox, "aruco_id": r["aruco_id"],
                      "gauge_value_bar": r["gauge_value_bar"],
+                     "pose_x_m": r["pose_x_m"], "pose_y_m": r["pose_y_m"],
+                     "pose_z_m": r["pose_z_m"],
                      "image_ref": r["image_ref"]},
         })
     return out

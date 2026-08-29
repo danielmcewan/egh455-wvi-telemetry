@@ -53,6 +53,16 @@ class DetectionData(BaseModel):
     # Feeds REQ-F-09's 2 bar drill threshold. Null unless cls == "gauge".
     gauge_value_bar: Optional[float] = None
 
+    # HLO-M-3 asks for "localisation Coordinates (x, y, z) indicating the
+    # current position of the UAV w.r.t the ArUCO marker", and HLO-M-2 says
+    # those come from ArUco pose estimation. Three separate places in HLO-M-3
+    # want them: the detection overlay, the logged data display, and storage.
+    # Metres, in the camera's frame of reference, as HLO-M-2 specifies.
+    # Null unless cls == "aruco" and IP managed to solve the pose.
+    pose_x_m: Optional[float] = None
+    pose_y_m: Optional[float] = None
+    pose_z_m: Optional[float] = None
+
     # REQ-F-07 demands the *images of the targets* be displayed, not just a
     # list of what was found. There are three legitimate ways for IP to get a
     # snapshot to us and all three end up populating `image_ref`:

@@ -1,4 +1,4 @@
-# WVI Data Contract v0.2
+# WVI Data Contract v0.3
 
 **Status:** proposed — needs sign-off from the AQ and IP leads.
 Once agreed this becomes the WVI section of the Interface Control Document (ICD).
@@ -6,6 +6,16 @@ Once agreed this becomes the WVI section of the Interface Control Document (ICD)
 An **interface contract** is just a written agreement about the shape of the data
 crossing the boundary between two people's code. It exists so neither of you has
 to wait for the other.
+
+**Changed in v0.3 — please read, this one needs action from IP.** Three new
+optional fields on a detection: `pose_x_m`, `pose_y_m`, `pose_z_m`. The customer
+needs document requires them and v0.2 did not carry them. HLO-M-3 asks for
+"ArUCO marker with its ID **and localisation Coordinates (x, y, z) indicating the
+current position of the UAV w.r.t the ArUCO marker**", and asks for the same
+coordinates again in the Logged Data Display and in Data Storage and Logging.
+HLO-M-2 says they come from ArUco pose estimation. Nothing was removed; a
+detection without them is still accepted, so you can add them when your pose
+solve is working.
 
 **Changed in v0.2:** target snapshot images. REQ-F-07 asks for *the images of the
 targets*, not only a list of what was found, so this version says exactly how a
@@ -79,6 +89,9 @@ Suggested rate: **1 Hz**. Faster is fine, the dashboard will keep up.
     "bbox": [412, 208, 96, 96],
     "aruco_id": null,
     "gauge_value_bar": 1.7,
+    "pose_x_m": null,
+    "pose_y_m": null,
+    "pose_z_m": null,
     "image_ref": "det_0088.jpg",
     "image_b64": null
   }
@@ -92,10 +105,27 @@ Suggested rate: **1 Hz**. Faster is fine, the dashboard will keep up.
 | `bbox` | yes | `[x, y, w, h]` in pixels, top-left origin, in the coordinate space of the frame you cropped from |
 | `aruco_id` | no | Integer, only when `class` is `aruco`, otherwise `null` |
 | `gauge_value_bar` | no | Only when `class` is `gauge`. **Feeds the 2 bar drill threshold in REQ-F-09** |
+| `pose_x_m` | no | Metres. UAV position relative to the marker, camera frame. Only when `class` is `aruco` |
+| `pose_y_m` | no | Metres, same frame |
+| `pose_z_m` | no | Metres, same frame. Typically the range to the marker |
 | `image_ref` | no | Name of the snapshot file — see below |
 | `image_b64` | no | The snapshot bytes inline — see below |
 
 Send one message **per detection event**, not per frame.
+
+### On the localisation coordinates
+
+Send all three or none — two out of three is treated as none, because a partial
+position is worse than no position on an operator's display. Units are **metres**
+and the frame is the camera's, as HLO-M-2 specifies ("extract their pose
+estimation to provide the UAV's local position coordinates (x, y, z) in the
+camera's frame of reference"). If you switch to a room-fixed frame later, say so
+and this contract gets a version bump, because the dashboard labels them as
+relative to the marker.
+
+`cv2.aruco.estimatePoseSingleMarkers` (or `solvePnP`) gives you a translation
+vector directly; the marker is 200 mm, dictionary `5x5_100`. WVI stores whatever
+you send and does no transformation.
 
 ---
 
@@ -219,6 +249,23 @@ Two options, and this one is **not yet decided** — it needs a conversation:
 Either way WVI needs the frames *with the boxes already on them*. Please raise
 this before integration week.
 
+## Payload LCD display mode — for the enclosure subsystem
+
+HLO-M-5 says the operator must be able to select what the LCD shows "using the
+proximity sensor on the Pimoroni Env sensor **and remotely from the GCS Web
+interface**". WVI provides the remote half; the panel itself is yours.
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/lcd` | GET | Returns `{"mode": "ip" \| "detection" \| "temperature", "set_at": ..., "set_by": ...}` |
+| `/api/lcd?mode=<mode>` | POST | The dashboard control. You should not need to call this |
+
+Poll the GET every second or two from your LCD driver and show whatever `mode`
+says. WVI holds the operator's choice and nothing else — it does not talk to the
+panel, and it does not know or care whether the proximity sensor has since
+changed the display locally. If you want local and remote selection to stay in
+step, POST back when the proximity sensor changes it, with `by=proximity`.
+
 ## Change control
 
 Any change to a field name or unit **must** be agreed by AQ, IP and WVI, and the
@@ -230,8 +277,11 @@ writing down.
 1. ~~Should `image_ref` be a path on the Pi's filesystem, or should IP POST the
    actual image bytes to WVI?~~ **Resolved in v0.2** — all three routes are
    supported; IP picks one and says which.
-2. Do we need a `location` or pose field for where the UAV was at capture time?
-   Not required by any REQ, but GCS may want it.
+2. ~~Do we need a `location` or pose field for where the UAV was at capture
+   time? Not required by any REQ, but GCS may want it.~~ **Resolved in v0.3, and
+   the earlier answer was wrong** — HLO-M-3 requires the localisation
+   coordinates in three separate places. Fields added; IP needs to populate
+   them.
 3. Is TAI a separate producer, or does it re-publish IP's detections with the
    classification filled in? Affects whether `source` is `IP` or `TAI`.
 4. **Who serves the annotated video?** See "The live camera feed" above. This is
