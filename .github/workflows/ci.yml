@@ -1,0 +1,44 @@
+name: ci
+
+# Gate: every module parses, the declared dependencies actually resolve, and
+# there are no undefined names or syntax-level errors.
+#
+# There is no test suite in this repo yet, so this workflow deliberately does
+# not pretend to run one. A green tick here means "it imports and installs",
+# not "it works" - worth being honest about rather than adding a placeholder
+# test that asserts nothing.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 3.12 matches the version pinned across the other repos, so a build
+      # that passes here passes on the machines too.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: install dependencies
+        run: pip install -r requirements.txt
+
+      - name: syntax check every module
+        run: python -m compileall -q app tools run.py
+
+      # Error-level rules only: undefined names, broken except clauses, syntax
+      # errors. Style rules would fail a repo that was never written to them.
+      - name: lint
+        run: |
+          pip install ruff
+          ruff check . --select=E9,F63,F7,F82 --output-format=github
