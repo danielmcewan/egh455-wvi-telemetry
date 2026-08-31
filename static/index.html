@@ -4,9 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>UAVPayloadTAQ-26 Group One — Web Visualisation (WVI)</title>
+  <!-- Inline so there is no second request and no 404 in the server log during
+       a demo. A telemetry trace on the accent navy. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231f3864'/%3E%3Cpath d='M2 11 L5 7 L8 9.5 L11 4 L14 8' fill='none' stroke='%23fff' stroke-width='1.6' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+
+<a class="skip" href="#main">Skip to dashboard</a>
 
 <header class="masthead">
   <div class="masthead-id">
@@ -24,12 +29,66 @@
     <div class="stat" id="sources">
       <dt>Sources</dt><dd id="sources-val">&mdash;</dd>
     </div>
+    <div class="stat" id="logged" title="Duration of continuous logged operation. REQ-M-15 requires 10 minutes.">
+      <dt>Logged</dt><dd id="logged-val">&mdash;</dd>
+    </div>
   </dl>
 </header>
 
-<main>
+<!-- HLO-M-3, first bullet: "Navigation Menu: A menu at the top of the interface
+     provides navigation options to different sections, e.g. Air quality charts,
+     identified targets, live video feed, and logs." The customer names the
+     sections, so the menu uses the customer's names for them. -->
+<nav class="mainnav" id="mainnav" aria-label="Dashboard sections">
+  <ul>
+    <li><a href="#sec-air"     data-sec="sec-air">Air Quality</a></li>
+    <li><a href="#sec-targets" data-sec="sec-targets">Identified Targets</a></li>
+    <li><a href="#sec-feed"    data-sec="sec-feed">Live Video Feed</a></li>
+    <li><a href="#sec-logs"    data-sec="sec-logs">Logs</a></li>
+    <li><a href="#sec-mission" data-sec="sec-mission">Mission Record</a></li>
+  </ul>
+  <label class="speak" title="HLO-M-2: the GCS notifies the operator by vocalising the detected target.">
+    <input type="checkbox" id="speak-toggle"> <span>Speak alerts</span>
+  </label>
+</nav>
 
-  <section class="block">
+<!-- REQ-F-05: the operator must be alerted to a target's TYPE. A list that
+     scrolls is not an alert, so the newest detection also gets announced here
+     and is read out by screen readers. -->
+<div class="alert" id="alert" data-state="idle" role="status" aria-live="polite">
+  <span class="alert-label">Target alert</span>
+  <span class="alert-body" id="alert-body">Awaiting first detection</span>
+  <button type="button" id="alert-dismiss" class="alert-x" aria-label="Dismiss alert">&times;</button>
+</div>
+
+<div class="toolbar">
+  <div class="search">
+    <label class="sr-only" for="q">Search telemetry</label>
+    <svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <path d="M10.4 10.4 L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
+    <input type="search" id="q" autocomplete="off" spellcheck="false"
+           role="combobox" aria-expanded="false" aria-controls="q-menu-list"
+           aria-autocomplete="list" aria-haspopup="listbox"
+           placeholder="Search targets and logged data, or type / for filters">
+    <button type="button" id="q-clear" class="q-clear" hidden aria-label="Clear search">&times;</button>
+
+    <!-- Typing "/" turns the box into a command palette. Free text alone
+         assumes the operator already knows that "aruco" is a class name and
+         "AQ" is a source; this lists what is actually searchable. Every entry
+         drives a control that already exists in the Logged Data panel. -->
+    <div class="qmenu" id="q-menu" hidden>
+      <p class="qmenu-head" id="q-menu-head"></p>
+      <ul class="qmenu-list" id="q-menu-list" role="listbox" aria-label="Search filters"></ul>
+    </div>
+  </div>
+  <span class="toolbar-hint" id="q-hint" aria-live="polite">Press <kbd>/</kbd> to search, then <kbd>/</kbd> again for filters</span>
+</div>
+
+<main id="main">
+
+  <section class="block" id="sec-air" tabindex="-1">
     <div class="block-head">
       <h2>Air Sampling</h2>
       <span class="tag">REQ-F-06</span>
@@ -40,7 +99,7 @@
   </section>
 
   <div class="columns">
-    <section class="block">
+    <section class="block" id="sec-feed" tabindex="-1">
       <div class="block-head">
         <h2>Object Detector Feed</h2>
         <span class="tag">REQ-F-07</span>
@@ -52,34 +111,128 @@
       </figure>
     </section>
 
-    <section class="block">
+    <section class="block" id="sec-targets" tabindex="-1">
       <div class="block-head">
         <h2>Target Detections</h2>
+        <span class="tag">REQ-F-05</span>
         <span class="tag">REQ-F-07</span>
         <span class="rule"></span>
+        <span class="controls">
+          <label for="tgt-class">Type</label>
+          <select id="tgt-class">
+            <option value="">All types</option>
+            <option value="valve_open">valve_open</option>
+            <option value="valve_closed">valve_closed</option>
+            <option value="gauge">gauge</option>
+            <option value="aruco">aruco</option>
+          </select>
+        </span>
       </div>
+      <div class="tally" id="tally"></div>
       <div class="targets" id="targets">
         <p class="empty">No targets detected.</p>
       </div>
+      <p class="panel-foot" id="targets-foot">&mdash;</p>
     </section>
   </div>
 
-  <section class="block">
+  <section class="block" id="sec-logs" tabindex="-1">
     <div class="block-head">
       <h2>Logged Data</h2>
       <span class="tag">REQ-F-08</span>
       <span class="rule"></span>
-      <span class="controls">
+      <span class="note">Every reading and detection, timestamped</span>
+    </div>
+
+    <div class="filters">
+      <div class="field">
         <label for="hist-kind">Record type</label>
         <select id="hist-kind">
           <option value="readings">Air readings</option>
           <option value="detections">Target detections</option>
         </select>
-        <button id="hist-refresh" type="button">Refresh</button>
-      </span>
+      </div>
+      <div class="field">
+        <label for="hist-source">Source</label>
+        <select id="hist-source"><option value="">Any</option></select>
+      </div>
+      <div class="field det-only">
+        <label for="hist-class">Target type</label>
+        <select id="hist-class"><option value="">Any</option></select>
+      </div>
+      <div class="field det-only">
+        <label for="hist-conf">Min confidence</label>
+        <select id="hist-conf">
+          <option value="">Any</option>
+          <option value="0.5">0.50</option>
+          <option value="0.7">0.70</option>
+          <option value="0.8">0.80</option>
+          <option value="0.9">0.90</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="hist-since">From (UTC)</label>
+        <input type="datetime-local" id="hist-since" step="1">
+      </div>
+      <div class="field">
+        <label for="hist-until">To (UTC)</label>
+        <input type="datetime-local" id="hist-until" step="1">
+      </div>
+      <div class="field">
+        <label for="hist-limit">Rows / page</label>
+        <select id="hist-limit">
+          <option value="50">50</option>
+          <option value="100" selected>100</option>
+          <option value="250">250</option>
+          <option value="500">500</option>
+        </select>
+      </div>
+      <div class="field actions">
+        <button type="button" id="hist-reset">Reset filters</button>
+        <button type="button" id="hist-refresh">Refresh</button>
+        <a class="btn" id="hist-csv" href="/api/export.csv" download>Download CSV</a>
+      </div>
     </div>
+
     <div class="table-wrap">
       <table id="hist"><thead></thead><tbody></tbody></table>
+    </div>
+
+    <div class="pager">
+      <span id="hist-count">&mdash;</span>
+      <span class="rule"></span>
+      <label class="auto"><input type="checkbox" id="hist-auto" checked> Auto-refresh</label>
+      <button type="button" id="hist-prev" disabled>&larr; Newer</button>
+      <button type="button" id="hist-next" disabled>Older &rarr;</button>
+    </div>
+  </section>
+
+  <section class="block" id="sec-mission" tabindex="-1">
+    <div class="block-head">
+      <h2>Mission Record &amp; Verification</h2>
+      <span class="tag">REQ-M-15</span>
+      <span class="tag">REQ-M-19</span>
+      <span class="tag">REQ-F-09</span>
+      <span class="rule"></span>
+      <span class="note">Evidence taken from the stored log, not from a counter in memory</span>
+    </div>
+    <div class="verify" id="verify"></div>
+
+    <!-- HLO-M-5: "The operator must be able to select the desired display ...
+         and remotely from the GCS Web interface." WVI holds the operator's
+         choice and exposes it at GET /api/lcd; the enclosure subsystem polls
+         that and drives the panel. -->
+    <div class="lcd" id="lcd">
+      <span class="lcd-label">Payload LCD display</span>
+      <label class="sr-only" for="lcd-mode">LCD display mode</label>
+      <select id="lcd-mode">
+        <option value="ip">IP address</option>
+        <option value="detection">Live target detection</option>
+        <option value="temperature">Temperature</option>
+      </select>
+      <button type="button" id="lcd-set">Set display</button>
+      <span class="lcd-state" id="lcd-state">&mdash;</span>
+      <span class="tag">HLO-M-5</span>
     </div>
   </section>
 
@@ -87,8 +240,22 @@
 
 <footer>
   <span>Transport: Server-Sent Events &middot; Video: MJPEG &middot; Store: SQLite</span>
-  <nav><a href="/docs">Interface documentation</a><a href="/healthz">Health</a><a href="/api/latency">Latency record</a></nav>
+  <nav>
+    <a href="/docs">Interface documentation</a>
+    <a href="/api/mission">Mission record</a>
+    <a href="/healthz">Health</a>
+    <a href="/api/latency">Latency record</a>
+  </nav>
 </footer>
+
+<!-- Full-size view of a target snapshot. Hidden until a thumbnail is clicked. -->
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Target snapshot">
+  <button type="button" class="lightbox-x" id="lightbox-close" aria-label="Close">&times;</button>
+  <figure>
+    <img id="lightbox-img" alt="">
+    <figcaption id="lightbox-cap"></figcaption>
+  </figure>
+</div>
 
 <script src="/static/app.js"></script>
 </body>

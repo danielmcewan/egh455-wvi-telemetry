@@ -8,15 +8,74 @@ The numbers wander realistically so the charts look alive, and a detection fires
 every few seconds so the target gallery fills up.
 """
 import asyncio
+import io
 import math
 import random
 import time
-from typing import Callable
+from typing import Callable, Optional
 
+from PIL import Image, ImageDraw
+
+from . import images
 from .models import Envelope, utcnow
 
 DETECTION_EVERY_S = 6.0
 CLASSES = ["valve_open", "valve_closed", "gauge", "aruco"]
+
+SNAPSHOT_W, SNAPSHOT_H = 224, 224
+CLASS_COLOURS = {
+    "valve_open":   ((214, 235, 219), (26, 127, 55)),
+    "valve_closed": ((247, 222, 219), (180, 35, 24)),
+    "gauge":        ((252, 243, 219), (154, 103, 0)),
+    "aruco":        ((222, 228, 240), (31, 56, 100)),
+}
+
+
+def _snapshot(cls: str, seq: int, label: str) -> Optional[str]:
+    """Write a stand-in target snapshot and return its stored name.
+
+    REQ-F-07 asks for the images of the targets, so the gallery needs pictures
+    to show before the IP subsystem exists. This writes a real JPEG into the
+    same directory real snapshots land in, by the same route IP would use when
+    it runs on the same Pi - so when their images arrive, nothing on this side
+    changes except that the pictures stop being drawings.
+    """
+    bg, fg = CLASS_COLOURS.get(cls, ((240, 240, 240), (60, 60, 60)))
+    img = Image.new("RGB", (SNAPSHOT_W, SNAPSHOT_H), bg)
+    d = ImageDraw.Draw(img)
+    d.rectangle([8, 8, SNAPSHOT_W - 9, SNAPSHOT_H - 9], outline=fg, width=2)
+
+    if cls == "aruco":
+        # A blocky marker-ish pattern, seeded so one ArUco id always looks the
+        # same twice - a gallery where every card is different noise is harder
+        # to sanity-check than one where repeats are recognisable.
+        rng = random.Random(seq)
+        cell = 24
+        for gx in range(4):
+            for gy in range(4):
+                if rng.random() < 0.5:
+                    x, y = 56 + gx * cell, 56 + gy * cell
+                    d.rectangle([x, y, x + cell - 2, y + cell - 2], fill=fg)
+    elif cls == "gauge":
+        d.ellipse([52, 44, 172, 164], outline=fg, width=3)
+        ang = math.radians(220 + (seq * 37) % 200)
+        d.line([112, 104, 112 + 46 * math.cos(ang), 104 + 46 * math.sin(ang)],
+               fill=fg, width=3)
+    else:
+        closed = cls == "valve_closed"
+        d.ellipse([64, 56, 160, 152], outline=fg, width=3)
+        d.line([112, 56, 112, 152] if closed else [64, 104, 160, 104],
+               fill=fg, width=5)
+
+    d.text((14, SNAPSHOT_H - 24), label, fill=fg)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=78)
+    try:
+        return images.save_bytes(buf.getvalue(), f"det_{seq:05d}")
+    except (ValueError, OSError):
+        # A missing thumbnail is a cosmetic problem; it must never take the
+        # telemetry stream down with it.
+        return None
 
 
 class Simulator:
@@ -52,6 +111,27 @@ class Simulator:
     def _detection(self) -> Envelope:
         self._det_seq += 1
         cls = random.choice(CLASSES)
+        aruco_id = random.randint(0, 12) if cls == "aruco" else None
+        # Deliberately straddles the 2 bar REQ-F-09 threshold so you can watch
+        # the drill-trigger condition flip during testing.
+        bar = round(random.uniform(0.8, 3.4), 2) if cls == "gauge" else None
+
+        # HLO-M-2: ArUco pose gives the UAV's local position in the camera's
+        # frame. Ranges are chosen to look like the real enclosure - a marker
+        # 1.5 to 4 m ahead, roughly level, at the 1-3 m flight altitude.
+        if cls == "aruco":
+            pose = (round(random.uniform(-1.8, 1.8), 2),
+                    round(random.uniform(-0.6, 0.6), 2),
+                    round(random.uniform(1.5, 4.0), 2))
+        else:
+            pose = (None, None, None)
+
+        label = cls
+        if aruco_id is not None:
+            label = f"{cls} #{aruco_id}"
+        elif bar is not None:
+            label = f"{cls} {bar:.2f} bar"
+
         return Envelope(
             type="detection",
             seq=self._det_seq,
@@ -61,11 +141,10 @@ class Simulator:
                 "class": cls,
                 "confidence": round(random.uniform(0.72, 0.98), 2),
                 "bbox": [random.randint(20, 400), random.randint(20, 300), 96, 96],
-                "aruco_id": random.randint(0, 12) if cls == "aruco" else None,
-                # Deliberately straddles the 2 bar REQ-F-09 threshold so you can
-                # watch the drill-trigger condition flip during testing.
-                "gauge_value_bar": round(random.uniform(0.8, 3.4), 2) if cls == "gauge" else None,
-                "image_ref": f"targets/det_{self._det_seq:04d}.jpg",
+                "aruco_id": aruco_id,
+                "gauge_value_bar": bar,
+                "pose_x_m": pose[0], "pose_y_m": pose[1], "pose_z_m": pose[2],
+                "image_ref": _snapshot(cls, self._det_seq, label),
             },
         )
 

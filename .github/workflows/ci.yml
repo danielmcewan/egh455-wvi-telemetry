@@ -1,7 +1,12 @@
 name: ci
 
-# Gate: every module parses, the declared dependencies actually resolve, and
-# there are no undefined names or syntax-level errors.
+# Gate: every module parses, the declared dependencies actually resolve, the
+# FastAPI app imports cleanly, and there are no undefined names or
+# syntax-level errors.
+#
+# The import step earns its place: it catches the common failure on this
+# project - a route added without its supporting dependency (python-multipart)
+# - which passes a syntax check and only explodes at import time.
 #
 # There is no test suite in this repo yet, so this workflow deliberately does
 # not pretend to run one. A green tick here means "it imports and installs",
@@ -10,7 +15,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, mobile-layout]
   pull_request:
   workflow_dispatch:
 
@@ -36,6 +41,9 @@ jobs:
 
       - name: syntax check every module
         run: python -m compileall -q app tools run.py
+
+      - name: import the app
+        run: python -c "from app.main import app; print('app imported OK:', app.title)"
 
       # Error-level rules only: undefined names, broken except clauses, syntax
       # errors. Style rules would fail a repo that was never written to them.

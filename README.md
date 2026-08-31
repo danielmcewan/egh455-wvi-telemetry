@@ -21,7 +21,23 @@ data — so the whole dashboard works with no hardware attached.
 | `/` | The dashboard |
 | `/docs` | Auto-generated API documentation. Paste this into your ICD |
 | `/healthz` | Which subsystems are alive, and how stale their data is |
-| `/api/latency` | Latency evidence for REQ-M-19 |
+| `/api/latency` | Latency evidence for REQ-M-19, with percentiles |
+| `/api/mission` | Continuous-operation evidence for REQ-M-15, and the detection tally |
+| `/api/history` | The searchable, pageable log (REQ-F-08) |
+| `/api/export.csv` | The same log as a download |
+| `/api/targets/image/<name>` | A stored target snapshot (REQ-F-07) |
+
+### What is on the page
+
+| Panel | Requirement | What it does |
+|---|---|---|
+| Search bar | — | One box. Filters the live target gallery instantly and queries the whole log on the server. `/` focuses it; typing `/` **in** it opens a filter menu (`/target`, `/source`, `/records`, `/confidence`, `/since`, `/rows`, `/reset`, `/export`) so the searchable vocabulary is discoverable rather than guessed |
+| Target alert | REQ-F-05 | Announces the newest target *type* in a live region, and flags the sub-2-bar drill condition |
+| Air Sampling tiles | REQ-F-06 | Seven live channels with sparklines |
+| Detector feed | REQ-F-07 | MJPEG stream |
+| Target Detections | REQ-F-05, F-07 | Snapshot thumbnails, click to enlarge, filter by type, per-type tally |
+| Logged Data | REQ-F-08 | Search, filter by type/source/confidence/time range, page, export CSV |
+| Mission Record | REQ-M-15, M-19, F-09 | The measurements stated next to the limits they have to meet |
 
 The startup banner prints an address other machines should use. `127.0.0.1` only
 works on this computer; the other one works across the network.
@@ -110,12 +126,26 @@ wrong** — that's the real test of this design.
 
 ## Still to do
 
+Everything below needs someone else, or hardware, or both. Nothing here is
+blocked on WVI code.
+
 - [ ] Get the contract signed off by AQ and IP — until then it's a guess
 - [ ] Deploy to the Pi and re-measure latency there (a laptop proves nothing about Pi speed)
 - [ ] Prove reachability from a **third** machine, not just a second (REQ-F-08 says *any* computer)
-- [ ] Point the camera at the real IP feed instead of the synthetic one
-- [ ] Decide whether `image_ref` is a file path or uploaded bytes — see `contract.md`
-- [ ] Run for 10 minutes continuously and keep the log (REQ-M-15)
+- [ ] **Point the camera at the real IP feed instead of the synthetic one.** Needs
+      a decision on who draws the bounding boxes — see "The live camera feed" in
+      `contract.md`. This is the last undecided interface
+- [ ] Confirm with IP which of the three image routes they will use
+- [ ] Run for 10 minutes continuously on the Pi and keep the log (REQ-M-15)
+
+Done:
+
+- [x] ~~Decide whether `image_ref` is a file path or uploaded bytes~~ — all three
+      routes are supported, IP picks one (`contract.md` v0.2)
+- [x] Target snapshots are displayed, not just listed (REQ-F-07)
+- [x] Search, filtering, paging and CSV export over the log (REQ-F-08)
+- [x] REQ-M-15 and REQ-M-19 evidence computed from the stored log and shown on
+      the page next to the limits they have to meet
 
 ## Understand this before your seminar
 
