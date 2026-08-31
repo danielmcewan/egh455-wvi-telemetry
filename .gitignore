@@ -17,3 +17,8 @@ targets/
 
 # Scratch image the publisher stub demo regenerates
 _demo_target_crop.jpg
+
+# Local editor/agent tooling config. Machine-specific - launch.json here
+# hardcodes a macOS venv path, and settings.local.json would carry personal
+# permission allowlists - so it is not shared with the team.
+.claude/
