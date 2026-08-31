@@ -69,10 +69,21 @@
       <path d="M10.4 10.4 L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
     </svg>
     <input type="search" id="q" autocomplete="off" spellcheck="false"
-           placeholder="Search targets and logged data — class, ArUco id, coordinates, source, timestamp…">
+           role="combobox" aria-expanded="false" aria-controls="q-menu-list"
+           aria-autocomplete="list" aria-haspopup="listbox"
+           placeholder="Search targets and logged data, or type / for filters">
     <button type="button" id="q-clear" class="q-clear" hidden aria-label="Clear search">&times;</button>
+
+    <!-- Typing "/" turns the box into a command palette. Free text alone
+         assumes the operator already knows that "aruco" is a class name and
+         "AQ" is a source; this lists what is actually searchable. Every entry
+         drives a control that already exists in the Logged Data panel. -->
+    <div class="qmenu" id="q-menu" hidden>
+      <p class="qmenu-head" id="q-menu-head"></p>
+      <ul class="qmenu-list" id="q-menu-list" role="listbox" aria-label="Search filters"></ul>
+    </div>
   </div>
-  <span class="toolbar-hint" id="q-hint">Press <kbd>/</kbd> to search</span>
+  <span class="toolbar-hint" id="q-hint" aria-live="polite">Press <kbd>/</kbd> to search, then <kbd>/</kbd> again for filters</span>
 </div>
 
 <main id="main">

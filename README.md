@@ -31,7 +31,7 @@ data — so the whole dashboard works with no hardware attached.
 
 | Panel | Requirement | What it does |
 |---|---|---|
-| Search bar | — | One box. Filters the live target gallery instantly and queries the whole log on the server. `/` focuses it |
+| Search bar | — | One box. Filters the live target gallery instantly and queries the whole log on the server. `/` focuses it; typing `/` **in** it opens a filter menu (`/target`, `/source`, `/records`, `/confidence`, `/since`, `/rows`, `/reset`, `/export`) so the searchable vocabulary is discoverable rather than guessed |
 | Target alert | REQ-F-05 | Announces the newest target *type* in a live region, and flags the sub-2-bar drill condition |
 | Air Sampling tiles | REQ-F-06 | Seven live channels with sparklines |
 | Detector feed | REQ-F-07 | MJPEG stream |

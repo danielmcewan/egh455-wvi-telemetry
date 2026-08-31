@@ -335,21 +335,361 @@ es.onmessage = e => {
 /* -------------------------------------------------------------- search */
 /* One search box drives the gallery (client side, over what is already here)
    and the log table (server side, over the whole flight). Debounced so typing
-   does not fire a query per keystroke. */
+   does not fire a query per keystroke.
+
+   Free text alone is a poor interface for this data: an operator has to
+   already know that "aruco" is a class name and "AQ" is a source before the
+   box is any use. Typing "/" therefore turns the box into a command palette
+   that lists what is actually searchable, so the vocabulary is discovered
+   rather than remembered. Every entry drives a control that already exists
+   in the Logged Data panel - the menu is a faster route to those filters,
+   never a second, separate filtering path that could disagree with them. */
 let searchTimer = null;
 const qInput = $("q");
+const qHint = $("q-hint");
 
-qInput.addEventListener("input", () => {
-  state.q = qInput.value.trim();
-  $("q-clear").hidden = !state.q;
+/* Detection-only filters are meaningless over the air readings table. One
+   function so the palette and the Record type dropdown cannot disagree. */
+function syncDetOnly() {
+  const detections = $("hist-kind").value === "detections";
+  document.querySelectorAll(".det-only").forEach(el => { el.hidden = !detections; });
+}
+
+/* Set a <select> even when the wanted value is not in it yet. hist-class and
+   hist-source are built from what the log actually contains, so "/target
+   aruco" before the first ArUco detection would otherwise silently land on
+   "Any" - a filter that says one thing and does another. */
+function setSelect(id, value) {
+  const sel = $(id);
+  if (!sel) return;
+  if (value && !Array.from(sel.options).some(o => o.value === value)) {
+    sel.appendChild(new Option(value, value));
+  }
+  sel.value = value;
+}
+
+/* Apply several controls at once, then refresh once. Dispatching change on
+   each select instead would fire a query per control. */
+function applyFilters(fn) {
+  fn();
+  syncDetOnly();
+  renderTargets();
+  loadHistory({ resetPage: true });
+}
+
+/* UTC, because the datetime-local inputs are labelled UTC and boundFrom()
+   appends the offset rather than converting. */
+function utcMinutesAgo(minutes) {
+  return new Date(Date.now() - minutes * 60000).toISOString().slice(0, 19);
+}
+
+/* ------------------------------------------------- the slash commands */
+/* `name` is what gets typed; `aliases` are the words an operator is likely to
+   reach for instead. `values` drives the second stage of the menu. */
+const SLASH_COMMANDS = [
+  {
+    name: "target", aliases: ["class", "type", "valve", "gauge", "aruco", "marker"],
+    hint: "Filter to one target type",
+    values: [
+      { value: "valve_open",   hint: "Open valve" },
+      { value: "valve_closed", hint: "Closed valve" },
+      { value: "gauge",        hint: "Pressure gauge — carries the bar reading" },
+      { value: "aruco",        hint: "ArUco marker — carries the x/y/z coordinates" },
+      { value: "", label: "any", hint: "Clear the target type filter" },
+    ],
+    run: v => applyFilters(() => {
+      setSelect("hist-kind", "detections");
+      setSelect("hist-class", v);
+      setSelect("tgt-class", v);
+    }),
+  },
+  {
+    name: "source", aliases: ["subsystem", "from", "aq", "ip", "tai", "sim"],
+    hint: "Filter to one producing subsystem",
+    values: [
+      { value: "AQ",  hint: "Air quality subsystem" },
+      { value: "IP",  hint: "Image processing subsystem" },
+      { value: "TAI", hint: "Target identification subsystem" },
+      { value: "SIM", hint: "Built-in simulator" },
+      { value: "", label: "any", hint: "Clear the source filter" },
+    ],
+    run: v => applyFilters(() => setSelect("hist-source", v)),
+  },
+  {
+    name: "records", aliases: ["kind", "table", "readings", "detections", "air"],
+    hint: "Which table the Logged Data panel shows",
+    values: [
+      { value: "detections", hint: "Target detections (REQ-F-05, F-07)" },
+      { value: "readings",   hint: "Air quality readings (REQ-F-06)" },
+    ],
+    run: v => applyFilters(() => setSelect("hist-kind", v)),
+  },
+  {
+    name: "confidence", aliases: ["conf", "min", "certainty"],
+    hint: "Minimum detection confidence",
+    values: [
+      { value: "0.9", label: "0.90", hint: "Only very confident detections" },
+      { value: "0.8", label: "0.80" },
+      { value: "0.7", label: "0.70" },
+      { value: "0.5", label: "0.50" },
+      { value: "", label: "any", hint: "Clear the confidence filter" },
+    ],
+    run: v => applyFilters(() => {
+      setSelect("hist-kind", "detections");
+      setSelect("hist-conf", v);
+    }),
+  },
+  {
+    name: "since", aliases: ["last", "recent", "time", "window", "when"],
+    hint: "Only records captured within a time window",
+    values: [
+      { value: "1",  label: "1m",  hint: "Last minute" },
+      { value: "5",  label: "5m",  hint: "Last five minutes" },
+      { value: "10", label: "10m", hint: "Last ten minutes — the REQ-M-15 window" },
+      { value: "30", label: "30m", hint: "Last half hour" },
+      { value: "",   label: "all", hint: "Clear the time window" },
+    ],
+    run: v => applyFilters(() => {
+      $("hist-since").value = v ? utcMinutesAgo(Number(v)) : "";
+      $("hist-until").value = "";
+    }),
+  },
+  {
+    name: "rows", aliases: ["page", "limit", "size"],
+    hint: "Rows per page in the log table",
+    values: [{ value: "50" }, { value: "100" }, { value: "250" }, { value: "500" }],
+    run: v => applyFilters(() => setSelect("hist-limit", v)),
+  },
+  {
+    name: "reset", aliases: ["clear", "everything", "all"],
+    hint: "Clear every filter and the search text",
+    run: () => {
+      setSelect("tgt-class", "");
+      $("hist-reset").click();
+      return "all filters cleared";
+    },
+  },
+  {
+    name: "export", aliases: ["csv", "download", "save"],
+    hint: "Download the filtered log as CSV",
+    run: () => {
+      $("hist-csv").click();
+      return "CSV download started";
+    },
+  },
+];
+
+/* ------------------------------------------------------ command palette */
+const menuEl = $("q-menu");
+const menuHeadEl = $("q-menu-head");
+const menuListEl = $("q-menu-list");
+let menuItems = [];
+let menuIndex = -1;
+
+const commandMode = () => qInput.value.startsWith("/");
+
+/* "/tar" -> still choosing a command. "/target ar" -> choosing a value for a
+   known command. The space is what separates the two stages. */
+function parseCommand(raw) {
+  const rest = raw.slice(1);
+  const sp = rest.indexOf(" ");
+  if (sp === -1) return { word: rest, cmd: null, arg: "" };
+  const word = rest.slice(0, sp).toLowerCase();
+  const cmd = SLASH_COMMANDS.find(c => c.name === word);
+  return { word, cmd, arg: rest.slice(sp + 1).trim() };
+}
+
+function commandMatches(c, needle) {
+  return !needle
+      || c.name.includes(needle)
+      || c.hint.toLowerCase().includes(needle)
+      || c.aliases.some(a => a.includes(needle));
+}
+
+function valueLabel(v) {
+  return v.label ?? (v.value || "any");
+}
+
+/* Build the list for whatever is currently typed. Stage one offers commands;
+   choosing one that takes a value rewrites the box and reopens at stage two
+   rather than applying anything, so nothing happens until a value is picked. */
+function buildMenuItems(raw) {
+  const { word, cmd, arg } = parseCommand(raw);
+
+  if (cmd && cmd.values) {
+    const needle = arg.toLowerCase();
+    menuHeadEl.textContent = `/${cmd.name} — ${cmd.hint}`;
+    return cmd.values
+      .filter(v => !needle
+                || valueLabel(v).toLowerCase().includes(needle)
+                || (v.hint || "").toLowerCase().includes(needle))
+      .map(v => ({
+        name: `/${cmd.name} ${valueLabel(v)}`,
+        hint: v.hint || "",
+        choose: () => { cmd.run(v.value); return `${cmd.name}: ${valueLabel(v)}`; },
+      }));
+  }
+
+  const needle = word.toLowerCase();
+  menuHeadEl.textContent = "Filters — type to narrow, ↑↓ to choose, Enter to select";
+  return SLASH_COMMANDS
+    .filter(c => commandMatches(c, needle))
+    .map(c => ({
+      name: `/${c.name}`,
+      hint: c.hint,
+      choose: () => {
+        if (!c.values) return c.run() ?? c.name;
+        // Takes a value: move to stage two instead of applying.
+        qInput.value = `/${c.name} `;
+        openMenu();
+        return null;
+      },
+    }));
+}
+
+function openMenu() {
+  menuItems = buildMenuItems(qInput.value);
+  menuListEl.replaceChildren();
+
+  if (!menuItems.length) {
+    const li = document.createElement("li");
+    li.className = "qmenu-empty";
+    // Escape only closes the menu; text starting with "/" is still read as a
+    // half-typed command, so the way out is to delete the slash.
+    li.textContent = "No filter matches that. Delete the / to search for it as text.";
+    menuListEl.appendChild(li);
+  } else {
+    menuItems.forEach((item, i) => {
+      const li = document.createElement("li");
+      li.className = "qopt";
+      li.id = `q-opt-${i}`;
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", "false");
+      li.innerHTML = `<span class="qopt-name"></span><span class="qopt-hint"></span>`;
+      li.querySelector(".qopt-name").textContent = item.name;
+      li.querySelector(".qopt-hint").textContent = item.hint;
+      menuListEl.appendChild(li);
+    });
+  }
+
+  menuEl.hidden = false;
+  qInput.setAttribute("aria-expanded", "true");
+  setMenuIndex(menuItems.length ? 0 : -1);
+}
+
+function closeMenu() {
+  menuEl.hidden = true;
+  menuItems = [];
+  menuIndex = -1;
+  qInput.setAttribute("aria-expanded", "false");
+  qInput.removeAttribute("aria-activedescendant");
+}
+
+function setMenuIndex(i) {
+  menuIndex = i;
+  Array.from(menuListEl.children).forEach((li, n) => {
+    if (li.classList.contains("qmenu-empty")) return;
+    li.setAttribute("aria-selected", String(n === i));
+  });
+  const active = menuListEl.children[i];
+  if (active) {
+    qInput.setAttribute("aria-activedescendant", active.id);
+    active.scrollIntoView({ block: "nearest" });
+  } else {
+    qInput.removeAttribute("aria-activedescendant");
+  }
+}
+
+function moveMenu(delta) {
+  if (!menuItems.length) return;
+  setMenuIndex((menuIndex + delta + menuItems.length) % menuItems.length);
+}
+
+/* The hint doubles as the confirmation that a command did something. Without
+   it a command applied from the top of the page changes a dropdown two
+   screens down and looks like it was ignored. */
+function reportApplied(message) {
+  if (!qHint) return;
+  if (message) {
+    qHint.textContent = `Filter applied — ${message}`;
+    qHint.dataset.applied = "true";
+  } else {
+    qHint.innerHTML = 'Press <kbd>/</kbd> to search, then <kbd>/</kbd> again for filters';
+    delete qHint.dataset.applied;
+  }
+}
+
+function chooseMenuItem(i) {
+  const item = menuItems[i];
+  if (!item) return;
+  const applied = item.choose();
+  if (applied === null) return;       // stage two just opened
+  qInput.value = "";
+  runSearch();
+  closeMenu();
+  reportApplied(applied);
+  qInput.focus();
+}
+
+/* ------------------------------------------------- free-text searching */
+/* Command text is never sent as a search term: "/tar" is half a command, not
+   something an operator wants matched against the log. */
+function runSearch({ immediate = false } = {}) {
+  const wasQ = state.q;
+  state.q = commandMode() ? "" : qInput.value.trim();
+  $("q-clear").hidden = !qInput.value;
   renderTargets();                       // instant, no round trip
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => loadHistory({ resetPage: true }), 250);
+  if (state.q === wasQ && !immediate) return;
+  searchTimer = setTimeout(() => loadHistory({ resetPage: true }), immediate ? 0 : 250);
+}
+
+qInput.addEventListener("input", () => {
+  // A confirmation of the last command goes stale the moment the operator
+  // starts typing something else. chooseMenuItem() re-sets it afterwards, so
+  // clearing it here does not wipe the message it is about to show.
+  if (qHint && qHint.dataset.applied) reportApplied(null);
+  if (commandMode()) openMenu(); else closeMenu();
+  runSearch();
+});
+
+qInput.addEventListener("keydown", e => {
+  if (menuEl.hidden) return;
+  switch (e.key) {
+    case "ArrowDown": e.preventDefault(); moveMenu(1); break;
+    case "ArrowUp":   e.preventDefault(); moveMenu(-1); break;
+    case "Enter":
+    case "Tab":       if (menuIndex < 0) return;
+                      e.preventDefault(); chooseMenuItem(menuIndex); break;
+    // Escape closes the menu without touching the box, so it does not also
+    // wipe what was typed - the document-level handler would do that.
+    case "Escape":    e.preventDefault(); e.stopPropagation(); closeMenu(); break;
+    default: return;
+  }
+});
+
+// mousedown rather than click, so the input never loses focus mid-selection.
+menuListEl.addEventListener("mousedown", e => {
+  const li = e.target.closest(".qopt");
+  if (!li) return;
+  e.preventDefault();
+  chooseMenuItem(Array.from(menuListEl.children).indexOf(li));
+});
+
+menuListEl.addEventListener("mousemove", e => {
+  const li = e.target.closest(".qopt");
+  if (li) setMenuIndex(Array.from(menuListEl.children).indexOf(li));
+});
+
+document.addEventListener("mousedown", e => {
+  if (!menuEl.hidden && !menuEl.contains(e.target) && e.target !== qInput) closeMenu();
 });
 
 $("q-clear").addEventListener("click", () => {
   qInput.value = "";
-  qInput.dispatchEvent(new Event("input"));
+  closeMenu();
+  runSearch({ immediate: true });
+  reportApplied(null);
   qInput.focus();
 });
 
@@ -514,8 +854,7 @@ $("hist-limit").addEventListener("change", () => loadHistory({ resetPage: true }
   $(id).addEventListener("change", () => loadHistory({ resetPage: true })));
 
 $("hist-kind").addEventListener("change", () => {
-  const detections = $("hist-kind").value === "detections";
-  document.querySelectorAll(".det-only").forEach(el => { el.hidden = !detections; });
+  syncDetOnly();
   loadHistory({ resetPage: true });
 });
 
@@ -546,7 +885,12 @@ function fillSelect(sel, values, anyLabel) {
   sel.replaceChildren();
   sel.appendChild(new Option(anyLabel, ""));
   values.forEach(v => sel.appendChild(new Option(v, v)));
-  if (values.includes(keep)) sel.value = keep;
+  /* These lists are rebuilt every minute from what the log actually holds.
+     A filter chosen from the slash menu can name a class or source that has
+     not been logged yet, and dropping it here would silently reset the filter
+     to "Any" a minute after the operator set it. */
+  if (keep && !values.includes(keep)) sel.appendChild(new Option(keep, keep));
+  sel.value = keep;
 }
 
 /* -------------------------------------------------------- verification */
@@ -752,7 +1096,7 @@ if ($("lcd-set")) {
 }
 
 /* ---------------------------------------------------------------- boot */
-document.querySelectorAll(".det-only").forEach(el => { el.hidden = true; });
+syncDetOnly();
 loadFilterOptions();
 loadHistory();
 loadVerification();

@@ -365,6 +365,42 @@ footer a:hover{color:var(--accent); border-bottom-color:var(--accent)}
 }
 .q-clear:hover{color:var(--ink)}
 .toolbar-hint{font-size:11px; color:var(--ink-3); white-space:nowrap}
+/* When the hint is reporting what a slash command just did it is feedback,
+   not decoration, so it stops being muted. */
+.toolbar-hint[data-applied]{color:var(--accent); font-weight:600}
+
+/* ------------------------------------------------- slash command palette */
+/* Anchored to .search, which is already position:relative. Above the sticky
+   navigation (z-index 30) or it would be half-covered on a scrolled page. */
+.qmenu{
+  position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:40;
+  background:var(--surface); border:1px solid var(--line-strong); border-radius:3px;
+  box-shadow:0 6px 20px rgba(20,24,29,.16);
+  overflow:hidden;
+}
+.qmenu-head{
+  margin:0; padding:7px 10px;
+  font-size:11px; color:var(--ink-3);
+  background:var(--surface-alt); border-bottom:1px solid var(--line);
+}
+.qmenu-list{
+  margin:0; padding:4px; list-style:none;
+  max-height:290px; overflow-y:auto;
+}
+.qopt{
+  display:flex; align-items:baseline; gap:14px;
+  padding:7px 8px; border-radius:2px; cursor:pointer;
+}
+.qopt-name{font:12.5px/1.3 var(--mono); font-weight:600; white-space:nowrap}
+.qopt-hint{
+  font-size:11.5px; color:var(--ink-3);
+  margin-left:auto; text-align:right;
+}
+/* aria-selected is the state a screen reader reads, so it is also the state
+   the highlight is drawn from - one source of truth, not two. */
+.qopt[aria-selected="true"]{background:var(--accent); color:#fff}
+.qopt[aria-selected="true"] .qopt-hint{color:#c9d8ee}
+.qmenu-empty{padding:9px 10px; font-size:12px; color:var(--ink-3)}
 kbd{
   font-family:var(--mono); font-size:10.5px; border:1px solid var(--line-strong);
   border-bottom-width:2px; border-radius:3px; padding:0 4px; background:var(--surface-alt);
@@ -524,7 +560,15 @@ kbd{
   .search{max-width:none}
   /* 16px is the threshold below which iOS Safari zooms the page on focus. */
   #q{font-size:16px; padding:11px 34px 11px 30px}
-  .toolbar-hint{display:none}
+  /* The hint is a keyboard tip on a phone with no keyboard - hide it, unless
+     it is carrying the confirmation of a filter that was just applied. */
+  .toolbar-hint:not([data-applied]){display:none}
+  .toolbar-hint[data-applied]{white-space:normal; flex-basis:100%}
+
+  /* Stacked, and tall enough to hit with a thumb. */
+  .qmenu-list{max-height:50vh}
+  .qopt{flex-direction:column; gap:2px; padding:10px 10px; min-height:44px}
+  .qopt-hint{margin-left:0; text-align:left}
 
   /* One filter per row reads better than two half-width ones on a phone. */
   .filters{grid-template-columns:1fr; padding:12px}
