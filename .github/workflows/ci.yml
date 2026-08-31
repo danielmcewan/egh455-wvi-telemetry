@@ -12,6 +12,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -55,7 +56,7 @@ jobs:
   # ---------------------------------------------------------------------------
   deploy:
     needs: python
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       VERCEL_ORG_ID: team_9DpT50im16Ck3www89qBdIVU
