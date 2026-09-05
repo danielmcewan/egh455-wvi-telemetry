@@ -1,3 +1,5 @@
+c
+
 # WVI — Web Visualisation subsystem
 
 The dashboard for UAVPayload<sup>TAQ</sup>-26. Runs on the Raspberry Pi, watched
@@ -13,52 +15,52 @@ Owns **REQ-F-06**, **REQ-F-07**, **REQ-F-08** and **REQ-M-19**.
 .venv\Scripts\python.exe run.py
 ```
 
-Then open <http://127.0.0.1:8000>. It starts with a **simulator** — fake sensor
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000). It starts with a **simulator** — fake sensor
 data — so the whole dashboard works with no hardware attached.
 
-| URL | What it is |
-|---|---|
-| `/` | The dashboard |
-| `/docs` | Auto-generated API documentation. Paste this into your ICD |
-| `/healthz` | Which subsystems are alive, and how stale their data is |
-| `/api/latency` | Latency evidence for REQ-M-19, with percentiles |
-| `/api/mission` | Continuous-operation evidence for REQ-M-15, and the detection tally |
-| `/api/history` | The searchable, pageable log (REQ-F-08) |
-| `/api/export.csv` | The same log as a download |
-| `/api/targets/image/<name>` | A stored target snapshot (REQ-F-07) |
+| URL                           | What it is                                                          |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `/`                         | The dashboard                                                       |
+| `/docs`                     | Auto-generated API documentation. Paste this into your ICD          |
+| `/healthz`                  | Which subsystems are alive, and how stale their data is             |
+| `/api/latency`              | Latency evidence for REQ-M-19, with percentiles                     |
+| `/api/mission`              | Continuous-operation evidence for REQ-M-15, and the detection tally |
+| `/api/history`              | The searchable, pageable log (REQ-F-08)                             |
+| `/api/export.csv`           | The same log as a download                                          |
+| `/api/targets/image/<name>` | A stored target snapshot (REQ-F-07)                                 |
 
 ### What is on the page
 
-| Panel | Requirement | What it does |
-|---|---|---|
-| Search bar | — | One box. Filters the live target gallery instantly and queries the whole log on the server. `/` focuses it; typing `/` **in** it opens a filter menu (`/target`, `/source`, `/records`, `/confidence`, `/since`, `/rows`, `/reset`, `/export`) so the searchable vocabulary is discoverable rather than guessed |
-| Target alert | REQ-F-05 | Announces the newest target *type* in a live region, and flags the sub-2-bar drill condition |
-| Air Sampling tiles | REQ-F-06 | Seven live channels with sparklines |
-| Detector feed | REQ-F-07 | MJPEG stream |
-| Target Detections | REQ-F-05, F-07 | Snapshot thumbnails, click to enlarge, filter by type, per-type tally |
-| Logged Data | REQ-F-08 | Search, filter by type/source/confidence/time range, page, export CSV |
-| Mission Record | REQ-M-15, M-19, F-09 | The measurements stated next to the limits they have to meet |
+| Panel              | Requirement          | What it does                                                                                                                                                                                                                                                                                                                             |
+| ------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search bar         | —                   | One box. Filters the live target gallery instantly and queries the whole log on the server.`/` focuses it; typing `/` **in** it opens a filter menu (`/target`, `/source`, `/records`, `/confidence`, `/since`, `/rows`, `/reset`, `/export`) so the searchable vocabulary is discoverable rather than guessed |
+| Target alert       | REQ-F-05             | Announces the newest target*type* in a live region, and flags the sub-2-bar drill condition                                                                                                                                                                                                                                            |
+| Air Sampling tiles | REQ-F-06             | Seven live channels with sparklines                                                                                                                                                                                                                                                                                                      |
+| Detector feed      | REQ-F-07             | MJPEG stream                                                                                                                                                                                                                                                                                                                             |
+| Target Detections  | REQ-F-05, F-07       | Snapshot thumbnails, click to enlarge, filter by type, per-type tally                                                                                                                                                                                                                                                                    |
+| Logged Data        | REQ-F-08             | Search, filter by type/source/confidence/time range, page, export CSV                                                                                                                                                                                                                                                                    |
+| Mission Record     | REQ-M-15, M-19, F-09 | The measurements stated next to the limits they have to meet                                                                                                                                                                                                                                                                             |
 
 The startup banner prints an address other machines should use. `127.0.0.1` only
 works on this computer; the other one works across the network.
 
 ## Jargon, in plain terms
 
-| Term | What it actually means |
-|---|---|
-| **Server-Sent Events (SSE)** | One connection the server pushes new data down whenever it has some. The browser doesn't have to keep asking |
-| **Polling** | The lazy alternative: asking "anything new?" every second and usually hearing "no" |
-| **MJPEG** | A video stream that's just ordinary JPEG photos sent one after another. Browsers show it in an `<img>` tag — no video player needed |
-| **Endpoint** | One URL the server answers on, e.g. `/api/history` |
-| **Ingest** | Data coming *in* to your server from someone else's code |
-| **Schema / contract** | The agreed shape of that data: field names, types, units |
-| **Adapter** | A small swappable piece that converts someone else's format into yours |
-| **SQLite** | A database that's just one file on disk. No server to install |
-| **Bind to 0.0.0.0** | "Accept connections from any network card." `127.0.0.1` means "this computer only" |
-| **Latency** | Delay. Here: sensor reading → visible on screen |
-| **NFR** | Non-functional requirement — a speed/reliability limit rather than a feature. REQ-M-19 is yours |
-| **Pub/sub** | Producers shout data onto a named channel; anyone interested listens. Nobody calls anybody directly |
-| **Venv** | A private folder of Python packages for this project only, so it can't break other software on your machine |
+| Term                               | What it actually means                                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Server-Sent Events (SSE)** | One connection the server pushes new data down whenever it has some. The browser doesn't have to keep asking                          |
+| **Polling**                  | The lazy alternative: asking "anything new?" every second and usually hearing "no"                                                    |
+| **MJPEG**                    | A video stream that's just ordinary JPEG photos sent one after another. Browsers show it in an`<img>` tag — no video player needed |
+| **Endpoint**                 | One URL the server answers on, e.g.`/api/history`                                                                                   |
+| **Ingest**                   | Data coming*in* to your server from someone else's code                                                                             |
+| **Schema / contract**        | The agreed shape of that data: field names, types, units                                                                              |
+| **Adapter**                  | A small swappable piece that converts someone else's format into yours                                                                |
+| **SQLite**                   | A database that's just one file on disk. No server to install                                                                         |
+| **Bind to 0.0.0.0**          | "Accept connections from any network card."`127.0.0.1` means "this computer only"                                                   |
+| **Latency**                  | Delay. Here: sensor reading → visible on screen                                                                                      |
+| **NFR**                      | Non-functional requirement — a speed/reliability limit rather than a feature. REQ-M-19 is yours                                      |
+| **Pub/sub**                  | Producers shout data onto a named channel; anyone interested listens. Nobody calls anybody directly                                   |
+| **Venv**                     | A private folder of Python packages for this project only, so it can't break other software on your machine                           |
 
 ## How the pieces fit
 
@@ -76,28 +78,28 @@ it, so swapping the source of data changes nothing else.
 
 ## Files
 
-| File | Job |
-|---|---|
-| `contract.md` | **The data contract.** Send this to the AQ and IP leads |
-| `app/models.py` | The contract as code. Change a field here = you changed the ICD |
-| `app/hub.py` | Fan-out to browsers, latest values, staleness tracking |
-| `app/db.py` | SQLite writing and history queries (REQ-F-08) |
-| `app/camera.py` | MJPEG stream (REQ-F-07) |
-| `app/simulator.py` | Fake producer so you can build without hardware |
-| `app/main.py` | The routes |
-| `static/` | The dashboard page |
-| `tools/publisher_stub.py` | **Give this to teammates.** All they need to send data |
-| `tools/measure_latency.py` | Generates REQ-M-19 evidence |
+| File                         | Job                                                             |
+| ---------------------------- | --------------------------------------------------------------- |
+| `contract.md`              | **The data contract.** Send this to the AQ and IP leads   |
+| `app/models.py`            | The contract as code. Change a field here = you changed the ICD |
+| `app/hub.py`               | Fan-out to browsers, latest values, staleness tracking          |
+| `app/db.py`                | SQLite writing and history queries (REQ-F-08)                   |
+| `app/camera.py`            | MJPEG s<br /><br />tream (REQ-F-07)                             |
+| `app/simulator.py`         | Fake producer so you can build without hardware                 |
+| `app/main.py`              | The routes                                                      |
+| `static/`                  | The dashboard page                                              |
+| `tools/publisher_stub.py`  | **Give this to teammates.** All they need to send data    |
+| `tools/measure_latency.py` | Generates REQ-M-19 evidence                                     |
 
 ## The three timestamps
 
 The single most important design decision here.
 
-| Stamp | Set by | Why |
-|---|---|---|
-| `t_capture` | The producer, when the sensor reads | The clock starts here |
-| `t_ingest` | This server, on arrival | Same machine as the producer on the Pi, so no clock-mismatch problem |
-| `t_render` | The browser, when drawn | The full path, but only trustworthy if both machines' clocks agree |
+| Stamp         | Set by                              | Why                                                                  |
+| ------------- | ----------------------------------- | -------------------------------------------------------------------- |
+| `t_capture` | The producer, when the sensor reads | The clock starts here                                                |
+| `t_ingest`  | This server, on arrival             | Same machine as the producer on the Pi, so no clock-mismatch problem |
+| `t_render`  | The browser, when drawn             | The full path, but only trustworthy if both machines' clocks agree   |
 
 `t_capture` → `t_ingest` is your **defensible** number for REQ-M-19. The browser
 figure is useful but carries a caveat you should state in your test report.
@@ -117,12 +119,12 @@ wrong** — that's the real test of this design.
 
 ## Settings
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `WVI_SIMULATOR` | `1` | Fake data on/off |
-| `WVI_WEBCAM` | `0` | Use a real webcam if OpenCV is installed |
-| `WVI_HOST` | `0.0.0.0` | Reachable from other machines |
-| `WVI_PORT` | `8000` | Port |
+| Variable          | Default     | Meaning                                  |
+| ----------------- | ----------- | ---------------------------------------- |
+| `WVI_SIMULATOR` | `1`       | Fake data on/off                         |
+| `WVI_WEBCAM`    | `0`       | Use a real webcam if OpenCV is installed |
+| `WVI_HOST`      | `0.0.0.0` | Reachable from other machines            |
+| `WVI_PORT`      | `8000`    | Port                                     |
 
 ## Still to do
 
@@ -133,19 +135,19 @@ blocked on WVI code.
 - [ ] Deploy to the Pi and re-measure latency there (a laptop proves nothing about Pi speed)
 - [ ] Prove reachability from a **third** machine, not just a second (REQ-F-08 says *any* computer)
 - [ ] **Point the camera at the real IP feed instead of the synthetic one.** Needs
-      a decision on who draws the bounding boxes — see "The live camera feed" in
-      `contract.md`. This is the last undecided interface
+  a decision on who draws the bounding boxes — see "The live camera feed" in
+  `contract.md`. This is the last undecided interface
 - [ ] Confirm with IP which of the three image routes they will use
 - [ ] Run for 10 minutes continuously on the Pi and keep the log (REQ-M-15)
 
 Done:
 
-- [x] ~~Decide whether `image_ref` is a file path or uploaded bytes~~ — all three
-      routes are supported, IP picks one (`contract.md` v0.2)
-- [x] Target snapshots are displayed, not just listed (REQ-F-07)
-- [x] Search, filtering, paging and CSV export over the log (REQ-F-08)
-- [x] REQ-M-15 and REQ-M-19 evidence computed from the stored log and shown on
-      the page next to the limits they have to meet
+- [X] ~~Decide whether `image_ref` is a file path or uploaded bytes~~ — all three
+  routes are supported, IP picks one (`contract.md` v0.2)
+- [X] Target snapshots are displayed, not just listed (REQ-F-07)
+- [X] Search, filtering, paging and CSV export over the log (REQ-F-08)
+- [X] REQ-M-15 and REQ-M-19 evidence computed from the stored log and shown on
+  the page next to the limits they have to meet
 
 ## Understand this before your seminar
 
@@ -160,3 +162,5 @@ answer without notes:
 
 Good exercise: delete `app/main.py`'s SSE handler and the ingest path, and
 rewrite both from scratch without looking. If you can, you own this code.
+
+Requirements to complete for the subsystem:
